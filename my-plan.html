@@ -338,21 +338,26 @@ function saveStore() {
 }
 
 function publishShared() {
-    // Aggregate all plans into a flat milestone completion map for the team dashboard
-    const allMilestones = [];
-    memberStore.plans.forEach(plan => {
-        let total = 0, done = 0;
-        plan.phases.forEach(ph => ph.milestones.forEach(m => {
-            total++;
-            if (m.status === "completed") done++;
-            else if (m.status === "in_progress") done += 0.5;
-        }));
-        allMilestones.push({ planTitle: plan.title, total, done, pct: total ? Math.round(done/total*100) : 0 });
+    // Publish rich data so the team dashboard can render dynamic plans
+    const sharedPlans = memberStore.plans.map(plan => {
+        let totalM = 0, doneM = 0;
+        const phases = plan.phases.map(ph => {
+            let phTotal = 0, phDone = 0;
+            ph.milestones.forEach(m => {
+                phTotal++; totalM++;
+                if (m.status === "completed") { phDone++; doneM++; }
+                else if (m.status === "in_progress") { phDone += 0.5; doneM += 0.5; }
+            });
+            return { title: ph.title, icon: ph.icon, total: phTotal, done: phDone, pct: phTotal ? Math.round(phDone/phTotal*100) : 0 };
+        });
+        return { title: plan.title, target_date: plan.target_date, phases, total: totalM, done: doneM, pct: totalM ? Math.round(doneM/totalM*100) : 0 };
     });
-    const overallTotal = allMilestones.reduce((s,p) => s + p.total, 0);
-    const overallDone = allMilestones.reduce((s,p) => s + p.done, 0);
+    const overallTotal = sharedPlans.reduce((s,p) => s + p.total, 0);
+    const overallDone = sharedPlans.reduce((s,p) => s + p.done, 0);
     localStorage.setItem(`readiness-shared-${currentMember.id}`, JSON.stringify({
-        plans: allMilestones,
+        memberName: currentMember.name,
+        memberRole: currentMember.role,
+        plans: sharedPlans,
         overallPct: overallTotal ? Math.round(overallDone/overallTotal*100) : 0,
         lastUpdated: new Date().toISOString()
     }));
