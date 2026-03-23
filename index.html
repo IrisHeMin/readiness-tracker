@@ -222,14 +222,30 @@ const plans = {
     }
 };
 
-// Merge localStorage shared progress (from my-plan.html) over defaults
+// Merge localStorage shared progress (from my-plan.html v2) over defaults
 (function mergeSharedProgress() {
     for (const memberId of Object.keys(plans)) {
         try {
             const shared = localStorage.getItem(`readiness-shared-${memberId}`);
             if (shared) {
                 const data = JSON.parse(shared);
-                if (data.progress) {
+                // v2 format: { plans: [{planTitle, total, done, pct},...], overallPct }
+                if (data.overallPct !== undefined) {
+                    // Override the plan's progress to reflect the actual percentage
+                    // We simulate it by adjusting the progress map proportionally
+                    const pct = data.overallPct;
+                    const mids = Object.keys(plans[memberId].progress);
+                    const total = mids.length;
+                    const completedCount = Math.round(pct / 100 * total);
+                    mids.forEach((mid, i) => {
+                        if (i < completedCount) plans[memberId].progress[mid] = "completed";
+                        else if (i === completedCount && pct % (100/total) > 0) plans[memberId].progress[mid] = "in_progress";
+                        else plans[memberId].progress[mid] = "not_started";
+                    });
+                    if (pct >= 100) plans[memberId].status = "completed";
+                }
+                // v1 fallback
+                else if (data.progress) {
                     plans[memberId].progress = { ...plans[memberId].progress, ...data.progress };
                     const allDone = Object.values(plans[memberId].progress).every(s => s === "completed");
                     if (allDone) plans[memberId].status = "completed";
