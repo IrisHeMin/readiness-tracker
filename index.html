@@ -37,11 +37,12 @@
             </div>
             <div>
                 <h1 class="text-xl font-bold text-gray-800">Readiness Plan Tracker</h1>
-                <p class="text-xs text-gray-500">Cloud Networking Support Team</p>
+                <p class="text-xs text-gray-500" id="team-name-label">Cloud Networking Support Team</p>
             </div>
         </div>
         <div class="flex items-center gap-3">
             <span class="text-xs text-gray-400" id="data-source-label"></span>
+            <button onclick="openTeamSettings()" class="px-4 py-2 text-sm bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition">⚙️ Team Settings</button>
             <a href="my-plan.html" class="px-4 py-2 text-sm bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl hover:shadow-lg transition">🚀 My Plan</a>
         </div>
     </div>
@@ -83,12 +84,49 @@
 </main>
 
 <footer class="text-center py-6 text-xs text-gray-400">
-    Readiness Plan Tracker v2.0 · Data syncs via localStorage (same browser) · <a href="my-plan.html" class="text-blue-400 hover:underline">Open My Plan →</a>
+    Readiness Plan Tracker v2.1 · Data syncs via localStorage (same browser) · <a href="my-plan.html" class="text-blue-400 hover:underline">Open My Plan →</a>
 </footer>
 
+<!-- Team Settings Modal -->
+<div id="modal-team" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden z-[100] flex items-center justify-center overflow-y-auto py-8">
+    <div class="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl p-8 max-w-lg w-full mx-4 max-h-[85vh] overflow-y-auto" style="animation:fadeIn 0.3s ease">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-xl font-bold text-gray-800">⚙️ Team Settings</h2>
+            <button onclick="closeTeamSettings()" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+        </div>
+        <!-- Team Name -->
+        <div class="mb-5">
+            <label class="text-sm font-medium text-gray-600 block mb-1">团队名称</label>
+            <input id="ts-team-name" type="text" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none" placeholder="例: Cloud Networking Support Team">
+        </div>
+        <!-- Members List -->
+        <div class="mb-4">
+            <label class="text-sm font-medium text-gray-600 block mb-2">团队成员</label>
+            <div id="ts-members-list" class="space-y-2"></div>
+        </div>
+        <!-- Add Member -->
+        <div class="bg-gray-50 rounded-xl p-4 mb-6">
+            <p class="text-sm font-medium text-gray-600 mb-2">➕ 添加成员</p>
+            <div class="grid grid-cols-5 gap-2">
+                <input id="ts-new-name" type="text" placeholder="姓名" class="col-span-2 px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-200 outline-none">
+                <input id="ts-new-role" type="text" placeholder="角色 (可选)" class="col-span-2 px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-200 outline-none">
+                <button onclick="tsAddMember()" class="px-3 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition">Add</button>
+            </div>
+        </div>
+        <!-- Actions -->
+        <div class="flex gap-3">
+            <button onclick="tsSave()" class="flex-1 py-2.5 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition">💾 Save</button>
+            <button onclick="tsReset()" class="px-4 py-2.5 bg-red-50 text-red-500 rounded-xl text-sm hover:bg-red-100 transition">Reset to Demo</button>
+            <button onclick="closeTeamSettings()" class="px-6 py-2.5 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <script>
-// ========== TEAM MEMBERS ==========
-const teamMembers = [
+// ========== SHARED TEAM CONFIG ==========
+const TEAM_CONFIG_KEY = 'readiness-team-config';
+
+const defaultTeamMembers = [
     { id:"alice", name:"Alice Wang",  role:"Support Engineer II" },
     { id:"bob",   name:"Bob Zhang",   role:"Support Engineer" },
     { id:"carol", name:"Carol Li",    role:"Support Engineer II" },
@@ -96,6 +134,21 @@ const teamMembers = [
     { id:"emma",  name:"Emma Xu",     role:"Senior Support Engineer" },
     { id:"frank", name:"Frank Zhao",  role:"Support Engineer" }
 ];
+
+function loadTeamConfig() {
+    try {
+        const raw = localStorage.getItem(TEAM_CONFIG_KEY);
+        if (raw) return JSON.parse(raw);
+    } catch(e) {}
+    return { teamName: "Cloud Networking Support Team", members: defaultTeamMembers };
+}
+
+function saveTeamConfig(config) {
+    localStorage.setItem(TEAM_CONFIG_KEY, JSON.stringify(config));
+}
+
+let teamConfig = loadTeamConfig();
+let teamMembers = teamConfig.members;
 
 // ========== DEMO FALLBACK DATA (shown when no localStorage data) ==========
 const demoData = {
@@ -165,6 +218,7 @@ function timeAgo(iso) {
 let compChart = null;
 
 function renderDashboard() {
+    document.getElementById('team-name-label').textContent = teamConfig.teamName || 'My Team';
     const data = loadAllMemberData();
     const members = teamMembers.map(m => ({ ...m, d: data[m.id] }));
 
@@ -341,10 +395,70 @@ function renderMemberCards(members) {
     }).join('');
 }
 
+// ========== TEAM SETTINGS ==========
+let tsMembers = [];
+
+function openTeamSettings() {
+    teamConfig = loadTeamConfig();
+    tsMembers = JSON.parse(JSON.stringify(teamConfig.members));
+    document.getElementById('ts-team-name').value = teamConfig.teamName || '';
+    renderTsMembers();
+    document.getElementById('modal-team').classList.remove('hidden');
+}
+
+function closeTeamSettings() { document.getElementById('modal-team').classList.add('hidden'); }
+
+function renderTsMembers() {
+    document.getElementById('ts-members-list').innerHTML = tsMembers.length === 0
+        ? '<p class="text-sm text-gray-400 py-3 text-center">还没有成员，请在下方添加</p>'
+        : tsMembers.map((m, i) => `
+        <div class="flex items-center gap-2 group bg-white rounded-lg px-3 py-2 border border-gray-100">
+            <div class="w-7 h-7 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0">${m.name.charAt(0)}</div>
+            <input type="text" value="${esc(m.name)}" onchange="tsMembers[${i}].name=this.value" class="flex-1 text-sm border-none bg-transparent font-medium px-1 focus:ring-0 outline-none" placeholder="Name">
+            <input type="text" value="${esc(m.role||'')}" onchange="tsMembers[${i}].role=this.value" class="flex-1 text-sm border-none bg-transparent text-gray-500 px-1 focus:ring-0 outline-none" placeholder="Role">
+            <button onclick="tsMembers.splice(${i},1); renderTsMembers()" class="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition px-1 text-lg" title="Remove">✕</button>
+        </div>`).join('');
+}
+
+function tsAddMember() {
+    const nameInput = document.getElementById('ts-new-name');
+    const roleInput = document.getElementById('ts-new-role');
+    const name = nameInput.value.trim();
+    if (!name) { nameInput.focus(); return; }
+    const id = name.toLowerCase().replace(/[^a-z0-9]/g, '') + '_' + Date.now().toString(36).slice(-4);
+    tsMembers.push({ id, name, role: roleInput.value.trim() || 'Support Engineer' });
+    nameInput.value = ''; roleInput.value = '';
+    renderTsMembers();
+    nameInput.focus();
+}
+
+function tsSave() {
+    const validMembers = tsMembers.filter(m => m.name.trim());
+    validMembers.forEach(m => { m.name = m.name.trim(); m.role = (m.role||'').trim(); });
+    const config = { teamName: document.getElementById('ts-team-name').value.trim() || 'My Team', members: validMembers };
+    saveTeamConfig(config);
+    teamConfig = config;
+    teamMembers = config.members;
+    closeTeamSettings();
+    renderDashboard();
+}
+
+function tsReset() {
+    if (!confirm('确定要恢复为 Demo 数据吗？这会覆盖当前团队设置。')) return;
+    localStorage.removeItem(TEAM_CONFIG_KEY);
+    teamConfig = loadTeamConfig();
+    teamMembers = teamConfig.members;
+    closeTeamSettings();
+    renderDashboard();
+}
+
+function esc(s) { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+
 // ========== INIT ==========
+document.getElementById('team-name-label').textContent = teamConfig.teamName || 'My Team';
 renderDashboard();
 // Auto-refresh every 30s to pick up localStorage changes
-setInterval(renderDashboard, 30000);
+setInterval(() => { teamConfig = loadTeamConfig(); teamMembers = teamConfig.members; renderDashboard(); }, 30000);
 </script>
 </body>
 </html>

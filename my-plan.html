@@ -198,15 +198,26 @@
 </div>
 
 <script>
-// ===================== TEAM DATA =====================
-const teamMembers = [
-    { id:"alice", name:"Alice Wang",  role:"Support Engineer II",     focus:["Networking","DNS"] },
-    { id:"bob",   name:"Bob Zhang",   role:"Support Engineer",        focus:["Networking","VPN"] },
-    { id:"carol", name:"Carol Li",    role:"Support Engineer II",     focus:["Storage","Networking"] },
-    { id:"dave",  name:"Dave Liu",    role:"Support Engineer",        focus:["Firewall","Networking"] },
-    { id:"emma",  name:"Emma Xu",     role:"Senior Support Engineer", focus:["Load Balancer","Networking"] },
-    { id:"frank", name:"Frank Zhao",  role:"Support Engineer",        focus:["Networking","ExpressRoute"] }
+// ===================== TEAM DATA (shared with index.html via localStorage) =====================
+const TEAM_CONFIG_KEY = 'readiness-team-config';
+const defaultTeamMembers = [
+    { id:"alice", name:"Alice Wang",  role:"Support Engineer II" },
+    { id:"bob",   name:"Bob Zhang",   role:"Support Engineer" },
+    { id:"carol", name:"Carol Li",    role:"Support Engineer II" },
+    { id:"dave",  name:"Dave Liu",    role:"Support Engineer" },
+    { id:"emma",  name:"Emma Xu",     role:"Senior Support Engineer" },
+    { id:"frank", name:"Frank Zhao",  role:"Support Engineer" }
 ];
+
+function loadTeamConfig() {
+    try {
+        const raw = localStorage.getItem(TEAM_CONFIG_KEY);
+        if (raw) return JSON.parse(raw);
+    } catch(e) {}
+    return { teamName: "Cloud Networking Support Team", members: defaultTeamMembers };
+}
+
+const teamMembers = loadTeamConfig().members;
 
 // ===================== TEMPLATES =====================
 const planTemplates = [
