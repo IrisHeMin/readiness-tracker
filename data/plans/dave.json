@@ -1,0 +1,26 @@
+{
+  "member_id": "dave",
+  "plans": [
+    {
+      "plan_id": "dave-net-2026",
+      "template_id": "azure-networking",
+      "title": "Azure Networking Readiness",
+      "start_date": "2026-02-15",
+      "target_date": "2026-05-15",
+      "status": "in_progress",
+      "progress": [
+        { "milestone_id": "net-101", "status": "completed", "completed_date": "2026-03-01", "notes": "" },
+        { "milestone_id": "net-102", "status": "in_progress", "notes": "VPN 配置遇到问题" },
+        { "milestone_id": "net-103", "status": "not_started" },
+        { "milestone_id": "net-201", "status": "not_started" },
+        { "milestone_id": "net-202", "status": "not_started" },
+        { "milestone_id": "net-203", "status": "not_started" },
+        { "milestone_id": "net-204", "status": "not_started" },
+        { "milestone_id": "net-301", "status": "not_started" },
+        { "milestone_id": "net-302", "status": "not_started" },
+        { "milestone_id": "net-303", "status": "not_started" },
+        { "milestone_id": "net-304", "status": "not_started" }
+      ]
+    }
+  ]
+}

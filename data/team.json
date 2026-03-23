@@ -1,0 +1,12 @@
+{
+  "team_name": "Cloud Networking Support Team",
+  "manager": "David Chen",
+  "members": [
+    { "id": "alice",   "name": "Alice Wang",    "role": "Support Engineer II",  "focus_areas": ["Networking", "DNS"] },
+    { "id": "bob",     "name": "Bob Zhang",     "role": "Support Engineer",     "focus_areas": ["Networking", "VPN"] },
+    { "id": "carol",   "name": "Carol Li",      "role": "Support Engineer II",  "focus_areas": ["Storage", "Networking"] },
+    { "id": "dave",    "name": "Dave Liu",      "role": "Support Engineer",     "focus_areas": ["Firewall", "Networking"] },
+    { "id": "emma",    "name": "Emma Xu",       "role": "Senior Support Engineer", "focus_areas": ["Load Balancer", "Networking"] },
+    { "id": "frank",   "name": "Frank Zhao",    "role": "Support Engineer",     "focus_areas": ["Networking", "ExpressRoute"] }
+  ]
+}

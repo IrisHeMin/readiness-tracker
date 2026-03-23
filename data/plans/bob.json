@@ -1,0 +1,26 @@
+{
+  "member_id": "bob",
+  "plans": [
+    {
+      "plan_id": "bob-net-2026",
+      "template_id": "azure-networking",
+      "title": "Azure Networking Readiness",
+      "start_date": "2026-02-01",
+      "target_date": "2026-05-01",
+      "status": "in_progress",
+      "progress": [
+        { "milestone_id": "net-101", "status": "completed", "completed_date": "2026-02-14", "notes": "Learn 路径完成" },
+        { "milestone_id": "net-102", "status": "completed", "completed_date": "2026-02-25", "notes": "实验环境已搭建" },
+        { "milestone_id": "net-103", "status": "in_progress", "notes": "NSG 部分完成, UDR 进行中" },
+        { "milestone_id": "net-201", "status": "not_started" },
+        { "milestone_id": "net-202", "status": "not_started" },
+        { "milestone_id": "net-203", "status": "not_started" },
+        { "milestone_id": "net-204", "status": "not_started" },
+        { "milestone_id": "net-301", "status": "not_started" },
+        { "milestone_id": "net-302", "status": "not_started" },
+        { "milestone_id": "net-303", "status": "not_started" },
+        { "milestone_id": "net-304", "status": "not_started" }
+      ]
+    }
+  ]
+}

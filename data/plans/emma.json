@@ -1,0 +1,26 @@
+{
+  "member_id": "emma",
+  "plans": [
+    {
+      "plan_id": "emma-net-2026",
+      "template_id": "azure-networking",
+      "title": "Azure Networking Readiness",
+      "start_date": "2025-11-01",
+      "target_date": "2026-02-01",
+      "status": "completed",
+      "progress": [
+        { "milestone_id": "net-101", "status": "completed", "completed_date": "2025-11-10", "notes": "" },
+        { "milestone_id": "net-102", "status": "completed", "completed_date": "2025-11-18", "notes": "" },
+        { "milestone_id": "net-103", "status": "completed", "completed_date": "2025-11-22", "notes": "" },
+        { "milestone_id": "net-201", "status": "completed", "completed_date": "2025-12-05", "notes": "" },
+        { "milestone_id": "net-202", "status": "completed", "completed_date": "2025-12-12", "notes": "" },
+        { "milestone_id": "net-203", "status": "completed", "completed_date": "2025-12-18", "notes": "" },
+        { "milestone_id": "net-204", "status": "completed", "completed_date": "2025-12-01", "notes": "Shadow David" },
+        { "milestone_id": "net-301", "status": "completed", "completed_date": "2026-01-10", "notes": "AZ-700 通过" },
+        { "milestone_id": "net-302", "status": "completed", "completed_date": "2026-01-20", "notes": "写了 ExpressRoute TSG" },
+        { "milestone_id": "net-303", "status": "completed", "completed_date": "2026-01-28", "notes": "完成 8 个高难度 Case" },
+        { "milestone_id": "net-304", "status": "completed", "completed_date": "2026-01-30", "notes": "分享了 ER 排查经验" }
+      ]
+    }
+  ]
+}

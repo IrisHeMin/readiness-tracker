@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Readiness Plan Tracker - Team Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(255,255,255,0.85); backdrop-filter: blur(12px); }
+        .heatmap-cell { transition: all 0.3s ease; cursor: pointer; }
+        .heatmap-cell:hover { transform: scale(1.08); box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 10; position: relative; }
+        .status-badge { font-size: 0.65rem; padding: 2px 8px; border-radius: 9999px; font-weight: 600; }
+        .progress-bar-inner { transition: width 1s ease-in-out; }
+        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
+        .card-hover { transition: all 0.3s ease; }
+        .tab-active { border-bottom: 3px solid #3b82f6; color: #3b82f6; font-weight: 600; }
+        .gantt-bar { border-radius: 4px; height: 24px; position: relative; }
+        .gantt-bar .label { position: absolute; left: 6px; top: 3px; font-size: 0.7rem; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .milestone-card { border-left: 4px solid; }
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .tooltip-custom { position: absolute; background: #1e293b; color: white; padding: 8px 12px; border-radius: 8px; font-size: 0.75rem; pointer-events: none; z-index: 100; max-width: 250px; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
+
+<!-- Header -->
+<header class="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold text-gray-800">Readiness Plan Tracker</h1>
+                <p class="text-xs text-gray-500">Cloud Networking Support Team</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <span class="text-sm text-gray-500">📅 Last updated: 2026-03-23</span>
+            <button onclick="showTab('team')" id="tab-team" class="px-4 py-2 text-sm tab-active">👥 Team Overview</button>
+            <button onclick="showTab('individual')" id="tab-individual" class="px-4 py-2 text-sm text-gray-500 hover:text-blue-500">👤 Individual View</button>
+        </div>
+    </div>
+</header>
+
+<!-- Main Content -->
+<main class="max-w-7xl mx-auto px-6 py-8">
+
+    <!-- ============ TEAM VIEW ============ -->
+    <div id="view-team" class="fade-in">
+
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-4 gap-6 mb-8" id="stats-cards"></div>
+
+        <!-- Heatmap -->
+        <div class="glass rounded-2xl shadow-lg p-6 mb-8 card-hover">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-semibold text-gray-800">📊 Team Readiness Heatmap</h2>
+                <div class="flex items-center gap-2 text-xs text-gray-500">
+                    <span class="inline-block w-3 h-3 rounded bg-red-100"></span> 0-25%
+                    <span class="inline-block w-3 h-3 rounded bg-yellow-200"></span> 25-50%
+                    <span class="inline-block w-3 h-3 rounded bg-blue-300"></span> 50-75%
+                    <span class="inline-block w-3 h-3 rounded bg-green-400"></span> 75-100%
+                </div>
+            </div>
+            <div id="heatmap-container" class="overflow-x-auto"></div>
+        </div>
+
+        <!-- Progress Bars + Trend Chart -->
+        <div class="grid grid-cols-5 gap-6 mb-8">
+            <div class="col-span-3 glass rounded-2xl shadow-lg p-6 card-hover">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">📈 Individual Progress</h2>
+                <div id="progress-bars"></div>
+            </div>
+            <div class="col-span-2 glass rounded-2xl shadow-lg p-6 card-hover">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">📉 Team Readiness Trend</h2>
+                <canvas id="trendChart" height="250"></canvas>
+            </div>
+        </div>
+
+        <!-- Phase Breakdown -->
+        <div class="glass rounded-2xl shadow-lg p-6 card-hover">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4">🎯 Phase Completion by Member</h2>
+            <canvas id="phaseChart" height="120"></canvas>
+        </div>
+    </div>
+
+    <!-- ============ INDIVIDUAL VIEW ============ -->
+    <div id="view-individual" class="hidden fade-in">
+        <!-- Person Selector -->
+        <div class="flex items-center gap-4 mb-8">
+            <label class="text-sm font-medium text-gray-600">Select Member:</label>
+            <select id="person-select" onchange="renderIndividualView()" class="px-4 py-2 rounded-xl border border-gray-200 bg-white shadow-sm focus:ring-2 focus:ring-blue-300 outline-none"></select>
+        </div>
+
+        <!-- Individual Stats -->
+        <div class="grid grid-cols-4 gap-6 mb-8" id="individual-stats"></div>
+
+        <div class="grid grid-cols-2 gap-6 mb-8">
+            <!-- Radar Chart -->
+            <div class="glass rounded-2xl shadow-lg p-6 card-hover">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">🕸️ Skill Radar</h2>
+                <canvas id="radarChart" height="300"></canvas>
+            </div>
+            <!-- Donut Chart -->
+            <div class="glass rounded-2xl shadow-lg p-6 card-hover">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">🍩 Milestone Status</h2>
+                <canvas id="donutChart" height="300"></canvas>
+            </div>
+        </div>
+
+        <!-- Gantt Chart -->
+        <div class="glass rounded-2xl shadow-lg p-6 mb-8 card-hover">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4">📅 Timeline (Gantt View)</h2>
+            <div id="gantt-container" class="overflow-x-auto"></div>
+        </div>
+
+        <!-- Milestones Detail -->
+        <div class="glass rounded-2xl shadow-lg p-6 card-hover">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4">📋 Milestone Details</h2>
+            <div id="milestones-detail" class="grid grid-cols-2 gap-4"></div>
+        </div>
+    </div>
+</main>
+
+<footer class="text-center py-6 text-xs text-gray-400">
+    Readiness Plan Tracker v1.0 · Built for Cloud Networking Support Team · Powered by GitHub Pages
+</footer>
+
+<script>
+// ========== EMBEDDED SAMPLE DATA ==========
+const teamData = {
+    team_name: "Cloud Networking Support Team",
+    manager: "David Chen",
+    members: [
+        { id: "alice",  name: "Alice Wang",   role: "Support Engineer II",      focus_areas: ["Networking","DNS"] },
+        { id: "bob",    name: "Bob Zhang",    role: "Support Engineer",         focus_areas: ["Networking","VPN"] },
+        { id: "carol",  name: "Carol Li",     role: "Support Engineer II",      focus_areas: ["Storage","Networking"] },
+        { id: "dave",   name: "Dave Liu",     role: "Support Engineer",         focus_areas: ["Firewall","Networking"] },
+        { id: "emma",   name: "Emma Xu",      role: "Senior Support Engineer",  focus_areas: ["Load Balancer","Networking"] },
+        { id: "frank",  name: "Frank Zhao",   role: "Support Engineer",         focus_areas: ["Networking","ExpressRoute"] }
+    ]
+};
+
+const template = {
+    phases: [
+        { phase: 1, title: "Foundation", milestones: ["net-101","net-102","net-103"] },
+        { phase: 2, title: "Intermediate", milestones: ["net-201","net-202","net-203","net-204"] },
+        { phase: 3, title: "Advanced", milestones: ["net-301","net-302","net-303","net-304"] }
+    ],
+    milestoneInfo: {
+        "net-101": { title: "完成 Azure Networking 基础学习路径", type: "learning", weight: 1, phase: 1 },
+        "net-102": { title: "搭建 Hub-Spoke 网络实验环境", type: "hands-on", weight: 1, phase: 1 },
+        "net-103": { title: "完成 NSG/UDR 基础 Lab", type: "hands-on", weight: 1, phase: 1 },
+        "net-201": { title: "独立处理 3 个 Connectivity Case", type: "case-practice", weight: 2, phase: 2 },
+        "net-202": { title: "完成 VPN Gateway 排查 Lab", type: "hands-on", weight: 1, phase: 2 },
+        "net-203": { title: "完成 DNS 解析排查 Lab", type: "hands-on", weight: 1, phase: 2 },
+        "net-204": { title: "Shadow Senior 处理复杂 Case", type: "mentoring", weight: 1, phase: 2 },
+        "net-301": { title: "通过 AZ-700 认证", type: "certification", weight: 3, phase: 3 },
+        "net-302": { title: "输出技术分享文档 (TSG/KB)", type: "knowledge-sharing", weight: 2, phase: 3 },
+        "net-303": { title: "独立处理 5 个高复杂度 Case", type: "case-practice", weight: 2, phase: 3 },
+        "net-304": { title: "完成团队内部技术分享", type: "presentation", weight: 1, phase: 3 }
+    },
+    skillDimensions: ["VNet & Subnet", "NSG & UDR", "VPN Gateway", "ExpressRoute", "DNS", "Load Balancer", "Firewall", "Network Watcher"]
+};
+
+const plans = {
+    alice: {
+        start_date: "2026-01-15", target_date: "2026-04-15", status: "in_progress",
+        progress: {
+            "net-101":"completed","net-102":"completed","net-103":"completed",
+            "net-201":"completed","net-202":"completed","net-203":"in_progress","net-204":"completed",
+            "net-301":"in_progress","net-302":"not_started","net-303":"in_progress","net-304":"not_started"
+        }
+    },
+    bob: {
+        start_date: "2026-02-01", target_date: "2026-05-01", status: "in_progress",
+        progress: {
+            "net-101":"completed","net-102":"completed","net-103":"in_progress",
+            "net-201":"not_started","net-202":"not_started","net-203":"not_started","net-204":"not_started",
+            "net-301":"not_started","net-302":"not_started","net-303":"not_started","net-304":"not_started"
+        }
+    },
+    carol: {
+        start_date: "2026-01-01", target_date: "2026-03-31", status: "in_progress",
+        progress: {
+            "net-101":"completed","net-102":"completed","net-103":"completed",
+            "net-201":"completed","net-202":"completed","net-203":"completed","net-204":"completed",
+            "net-301":"completed","net-302":"completed","net-303":"in_progress","net-304":"not_started"
+        }
+    },
+    dave: {
+        start_date: "2026-02-15", target_date: "2026-05-15", status: "in_progress",
+        progress: {
+            "net-101":"completed","net-102":"in_progress","net-103":"not_started",
+            "net-201":"not_started","net-202":"not_started","net-203":"not_started","net-204":"not_started",
+            "net-301":"not_started","net-302":"not_started","net-303":"not_started","net-304":"not_started"
+        }
+    },
+    emma: {
+        start_date: "2025-11-01", target_date: "2026-02-01", status: "completed",
+        progress: {
+            "net-101":"completed","net-102":"completed","net-103":"completed",
+            "net-201":"completed","net-202":"completed","net-203":"completed","net-204":"completed",
+            "net-301":"completed","net-302":"completed","net-303":"completed","net-304":"completed"
+        }
+    },
+    frank: {
+        start_date: "2026-03-01", target_date: "2026-06-01", status: "in_progress",
+        progress: {
+            "net-101":"in_progress","net-102":"not_started","net-103":"not_started",
+            "net-201":"not_started","net-202":"not_started","net-203":"not_started","net-204":"not_started",
+            "net-301":"not_started","net-302":"not_started","net-303":"not_started","net-304":"not_started"
+        }
+    }
+};
+
+// ========== UTILITY FUNCTIONS ==========
+const statusColors = {
+    completed: { bg: "bg-emerald-100", text: "text-emerald-700", border: "border-emerald-400", hex: "#10b981" },
+    in_progress: { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-400", hex: "#3b82f6" },
+    not_started: { bg: "bg-gray-100", text: "text-gray-500", border: "border-gray-300", hex: "#9ca3af" }
+};
+const typeIcons = { learning: "📚", "hands-on": "🔧", "case-practice": "🎯", mentoring: "👥", certification: "🏆", "knowledge-sharing": "📝", presentation: "🎤" };
+
+function calcWeightedProgress(progressMap) {
+    let totalWeight = 0, completedWeight = 0, inProgressWeight = 0;
+    for (const [mid, status] of Object.entries(progressMap)) {
+        const w = template.milestoneInfo[mid]?.weight || 1;
+        totalWeight += w;
+        if (status === "completed") completedWeight += w;
+        else if (status === "in_progress") inProgressWeight += w * 0.5;
+    }
+    return totalWeight === 0 ? 0 : Math.round(((completedWeight + inProgressWeight) / totalWeight) * 100);
+}
+
+function calcPhaseProgress(progressMap, phaseNum) {
+    const phase = template.phases.find(p => p.phase === phaseNum);
+    if (!phase) return 0;
+    const total = phase.milestones.length;
+    let done = 0;
+    phase.milestones.forEach(mid => { if (progressMap[mid] === "completed") done++; else if (progressMap[mid] === "in_progress") done += 0.5; });
+    return Math.round((done / total) * 100);
+}
+
+function getHeatColor(pct) {
+    if (pct >= 90) return "bg-emerald-500 text-white";
+    if (pct >= 75) return "bg-emerald-400 text-white";
+    if (pct >= 50) return "bg-blue-400 text-white";
+    if (pct >= 25) return "bg-yellow-300 text-gray-800";
+    if (pct > 0)  return "bg-orange-200 text-gray-800";
+    return "bg-red-100 text-gray-500";
+}
+
+// ========== TAB SWITCHING ==========
+let radarChartInstance = null, donutChartInstance = null, trendChartInstance = null, phaseChartInstance = null;
+
+function showTab(tab) {
+    document.getElementById('view-team').classList.toggle('hidden', tab !== 'team');
+    document.getElementById('view-individual').classList.toggle('hidden', tab !== 'individual');
+    document.getElementById('tab-team').classList.toggle('tab-active', tab === 'team');
+    document.getElementById('tab-individual').classList.toggle('tab-active', tab === 'individual');
+    document.getElementById('tab-team').classList.toggle('text-gray-500', tab !== 'team');
+    document.getElementById('tab-individual').classList.toggle('text-gray-500', tab !== 'individual');
+    if (tab === 'individual') renderIndividualView();
+}
+
+// ========== TEAM VIEW RENDERING ==========
+function renderTeamView() {
+    const members = teamData.members;
+    const progressList = members.map(m => ({ ...m, pct: calcWeightedProgress(plans[m.id].progress) }));
+    const avgProgress = Math.round(progressList.reduce((s, p) => s + p.pct, 0) / progressList.length);
+    const completedCount = Object.values(plans).filter(p => p.status === "completed").length;
+    const atRiskCount = progressList.filter(p => p.pct < 20 && plans[p.id].status !== "completed").length;
+
+    // Stats Cards
+    document.getElementById('stats-cards').innerHTML = `
+        <div class="glass rounded-2xl shadow-lg p-6 card-hover">
+            <p class="text-sm text-gray-500 mb-1">👥 Team Members</p>
+            <p class="text-3xl font-bold text-gray-800">${members.length}</p>
+        </div>
+        <div class="glass rounded-2xl shadow-lg p-6 card-hover">
+            <p class="text-sm text-gray-500 mb-1">📊 Average Progress</p>
+            <p class="text-3xl font-bold text-blue-600">${avgProgress}%</p>
+        </div>
+        <div class="glass rounded-2xl shadow-lg p-6 card-hover">
+            <p class="text-sm text-gray-500 mb-1">✅ Completed Plans</p>
+            <p class="text-3xl font-bold text-emerald-600">${completedCount}</p>
+        </div>
+        <div class="glass rounded-2xl shadow-lg p-6 card-hover">
+            <p class="text-sm text-gray-500 mb-1">⚠️ Needs Attention</p>
+            <p class="text-3xl font-bold text-orange-500">${atRiskCount}</p>
+        </div>`;
+
+    // Progress Bars
+    const sorted = [...progressList].sort((a, b) => b.pct - a.pct);
+    document.getElementById('progress-bars').innerHTML = sorted.map(m => {
+        const statusLabel = plans[m.id].status === "completed" ? "✅ Completed" : m.pct < 20 ? "⚠️ Needs Attention" : "🔄 In Progress";
+        const barColor = plans[m.id].status === "completed" ? "bg-emerald-500" : m.pct < 20 ? "bg-orange-400" : "bg-blue-500";
+        return `<div class="mb-4 cursor-pointer" onclick="showTab('individual'); document.getElementById('person-select').value='${m.id}'; renderIndividualView();">
+            <div class="flex items-center justify-between mb-1">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm font-semibold text-gray-700">${m.name}</span>
+                    <span class="text-xs text-gray-400">${m.role}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-gray-400">${statusLabel}</span>
+                    <span class="text-sm font-bold text-gray-700">${m.pct}%</span>
+                </div>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                <div class="progress-bar-inner ${barColor} h-3 rounded-full" style="width: ${m.pct}%"></div>
+            </div>
+        </div>`;
+    }).join('');
+
+    // Heatmap
+    const phaseLabels = template.phases.map(p => `Phase ${p.phase}: ${p.title}`);
+    let heatmapHTML = '<table class="w-full"><thead><tr><th class="text-left text-sm text-gray-500 pb-2 pr-4">Member</th>';
+    phaseLabels.forEach(l => { heatmapHTML += `<th class="text-center text-xs text-gray-500 pb-2 px-2">${l}</th>`; });
+    heatmapHTML += `<th class="text-center text-xs text-gray-500 pb-2 px-2 font-bold">Overall</th></tr></thead><tbody>`;
+    members.forEach(m => {
+        const overall = calcWeightedProgress(plans[m.id].progress);
+        heatmapHTML += `<tr><td class="text-sm font-medium text-gray-700 py-2 pr-4">${m.name}</td>`;
+        template.phases.forEach(p => {
+            const pct = calcPhaseProgress(plans[m.id].progress, p.phase);
+            heatmapHTML += `<td class="px-2 py-2"><div class="heatmap-cell ${getHeatColor(pct)} rounded-lg text-center py-3 text-sm font-semibold">${pct}%</div></td>`;
+        });
+        heatmapHTML += `<td class="px-2 py-2"><div class="heatmap-cell ${getHeatColor(overall)} rounded-lg text-center py-3 text-sm font-bold">${overall}%</div></td>`;
+        heatmapHTML += '</tr>';
+    });
+    heatmapHTML += '</tbody></table>';
+    document.getElementById('heatmap-container').innerHTML = heatmapHTML;
+
+    // Trend Chart (simulated monthly data)
+    if (trendChartInstance) trendChartInstance.destroy();
+    const ctx = document.getElementById('trendChart').getContext('2d');
+    trendChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['Nov', 'Dec', 'Jan', 'Feb', 'Mar'],
+            datasets: [
+                { label: 'Team Average', data: [8, 18, 32, 48, avgProgress], borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.4, pointRadius: 5, pointBackgroundColor: '#3b82f6' },
+                { label: 'Target Line', data: [20, 40, 60, 80, 100], borderColor: '#d1d5db', borderDash: [5,5], pointRadius: 0, fill: false }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, padding: 15 } } },
+            scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' } } }
+        }
+    });
+
+    // Phase Grouped Bar Chart
+    if (phaseChartInstance) phaseChartInstance.destroy();
+    const ctx2 = document.getElementById('phaseChart').getContext('2d');
+    const phaseColors = ['#93c5fd', '#60a5fa', '#3b82f6'];
+    phaseChartInstance = new Chart(ctx2, {
+        type: 'bar',
+        data: {
+            labels: members.map(m => m.name),
+            datasets: template.phases.map((p, i) => ({
+                label: `Phase ${p.phase}: ${p.title}`,
+                data: members.map(m => calcPhaseProgress(plans[m.id].progress, p.phase)),
+                backgroundColor: phaseColors[i],
+                borderRadius: 4
+            }))
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, padding: 15 } } },
+            scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' } }, x: { grid: { display: false } } }
+        }
+    });
+
+    // Populate person selector
+    const sel = document.getElementById('person-select');
+    sel.innerHTML = members.map(m => `<option value="${m.id}">${m.name} - ${m.role}</option>`).join('');
+}
+
+// ========== INDIVIDUAL VIEW RENDERING ==========
+function renderIndividualView() {
+    const memberId = document.getElementById('person-select').value;
+    const member = teamData.members.find(m => m.id === memberId);
+    const plan = plans[memberId];
+    if (!member || !plan) return;
+
+    const overall = calcWeightedProgress(plan.progress);
+    const completed = Object.values(plan.progress).filter(s => s === "completed").length;
+    const inProgress = Object.values(plan.progress).filter(s => s === "in_progress").length;
+    const notStarted = Object.values(plan.progress).filter(s => s === "not_started").length;
+    const total = Object.keys(plan.progress).length;
+
+    // Stats
+    document.getElementById('individual-stats').innerHTML = `
+        <div class="glass rounded-2xl shadow-lg p-5 card-hover">
+            <p class="text-xs text-gray-500 mb-1">Overall Progress</p>
+            <p class="text-2xl font-bold text-blue-600">${overall}%</p>
+            <div class="w-full bg-gray-200 rounded-full h-2 mt-2"><div class="bg-blue-500 h-2 rounded-full progress-bar-inner" style="width:${overall}%"></div></div>
+        </div>
+        <div class="glass rounded-2xl shadow-lg p-5 card-hover">
+            <p class="text-xs text-gray-500 mb-1">✅ Completed</p>
+            <p class="text-2xl font-bold text-emerald-600">${completed} <span class="text-sm font-normal text-gray-400">/ ${total}</span></p>
+        </div>
+        <div class="glass rounded-2xl shadow-lg p-5 card-hover">
+            <p class="text-xs text-gray-500 mb-1">🔄 In Progress</p>
+            <p class="text-2xl font-bold text-blue-500">${inProgress}</p>
+        </div>
+        <div class="glass rounded-2xl shadow-lg p-5 card-hover">
+            <p class="text-xs text-gray-500 mb-1">📅 Target Date</p>
+            <p class="text-lg font-bold text-gray-700">${plan.target_date}</p>
+            <p class="text-xs text-gray-400 mt-1">Started: ${plan.start_date}</p>
+        </div>`;
+
+    // Radar Chart — Skill coverage based on phase completion
+    if (radarChartInstance) radarChartInstance.destroy();
+    const radarData = template.skillDimensions.map((_, i) => {
+        // Map dimensions to milestones roughly
+        const milestoneKeys = Object.keys(plan.progress);
+        const sliceSize = Math.ceil(milestoneKeys.length / template.skillDimensions.length);
+        const slice = milestoneKeys.slice(i * sliceSize, (i + 1) * sliceSize);
+        if (slice.length === 0) return Math.random() * 40 + 30; // fallback
+        let score = 0;
+        slice.forEach(mid => { if (plan.progress[mid] === "completed") score += 100; else if (plan.progress[mid] === "in_progress") score += 50; });
+        return Math.round(score / slice.length);
+    });
+    const ctx3 = document.getElementById('radarChart').getContext('2d');
+    radarChartInstance = new Chart(ctx3, {
+        type: 'radar',
+        data: {
+            labels: template.skillDimensions,
+            datasets: [{
+                label: member.name,
+                data: radarData,
+                backgroundColor: 'rgba(59,130,246,0.2)',
+                borderColor: '#3b82f6',
+                pointBackgroundColor: '#3b82f6',
+                pointBorderColor: '#fff',
+                pointRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: { r: { beginAtZero: true, max: 100, ticks: { stepSize: 25, display: false }, grid: { color: '#e5e7eb' }, pointLabels: { font: { size: 11 } } } },
+            plugins: { legend: { display: false } }
+        }
+    });
+
+    // Donut Chart
+    if (donutChartInstance) donutChartInstance.destroy();
+    const ctx4 = document.getElementById('donutChart').getContext('2d');
+    donutChartInstance = new Chart(ctx4, {
+        type: 'doughnut',
+        data: {
+            labels: ['Completed', 'In Progress', 'Not Started'],
+            datasets: [{ data: [completed, inProgress, notStarted], backgroundColor: ['#10b981', '#3b82f6', '#d1d5db'], borderWidth: 0, hoverOffset: 8 }]
+        },
+        options: {
+            responsive: true,
+            cutout: '65%',
+            plugins: {
+                legend: { position: 'bottom', labels: { usePointStyle: true, padding: 20 } },
+                tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed} milestone(s)` } }
+            }
+        }
+    });
+
+    // Gantt Chart
+    renderGantt(memberId);
+
+    // Milestone Details
+    const detailHTML = Object.entries(plan.progress).map(([mid, status]) => {
+        const info = template.milestoneInfo[mid];
+        if (!info) return '';
+        const sc = statusColors[status];
+        const icon = typeIcons[info.type] || "📌";
+        const phaseLabel = `Phase ${info.phase}`;
+        return `<div class="milestone-card ${sc.border} ${sc.bg} rounded-xl p-4">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-lg">${icon}</span>
+                <span class="status-badge ${sc.bg} ${sc.text}">${status.replace('_',' ').toUpperCase()}</span>
+            </div>
+            <p class="text-sm font-semibold text-gray-800 mb-1">${info.title}</p>
+            <div class="flex items-center gap-2 text-xs text-gray-500">
+                <span class="bg-white/60 px-2 py-0.5 rounded">${phaseLabel}</span>
+                <span class="bg-white/60 px-2 py-0.5 rounded">${info.type}</span>
+                <span class="bg-white/60 px-2 py-0.5 rounded">Weight: ${info.weight}</span>
+            </div>
+        </div>`;
+    }).join('');
+    document.getElementById('milestones-detail').innerHTML = detailHTML;
+}
+
+function renderGantt(memberId) {
+    const plan = plans[memberId];
+    const startDate = new Date(plan.start_date);
+    const endDate = new Date(plan.target_date);
+    const totalDays = (endDate - startDate) / (1000 * 60 * 60 * 24);
+    const today = new Date('2026-03-23');
+    const todayOffset = Math.max(0, Math.min(100, ((today - startDate) / (1000 * 60 * 60 * 24)) / totalDays * 100));
+
+    let milestoneIndex = 0;
+    const totalMilestones = Object.keys(plan.progress).length;
+    let html = `<div class="relative" style="min-height: ${totalMilestones * 36 + 40}px">`;
+
+    // Today marker
+    html += `<div class="absolute top-0 bottom-0" style="left:${todayOffset}%; width:2px; background:#ef4444; z-index:5;"><div class="absolute -top-5 -left-8 text-xs text-red-500 font-semibold">Today</div></div>`;
+
+    // Month labels
+    html += '<div class="flex justify-between text-xs text-gray-400 mb-2 px-1">';
+    let d = new Date(startDate);
+    while (d <= endDate) {
+        const offset = ((d - startDate) / (1000 * 60 * 60 * 24)) / totalDays * 100;
+        html += `<span style="position:absolute;left:${offset}%">${d.toLocaleDateString('en',{month:'short',year:'2-digit'})}</span>`;
+        d.setMonth(d.getMonth() + 1);
+    }
+    html += '</div>';
+
+    template.phases.forEach(phase => {
+        phase.milestones.forEach(mid => {
+            const status = plan.progress[mid] || "not_started";
+            const info = template.milestoneInfo[mid];
+            const segmentWidth = (1 / totalMilestones) * 100;
+            const left = milestoneIndex * segmentWidth;
+            const barColor = status === "completed" ? "#10b981" : status === "in_progress" ? "#3b82f6" : "#e5e7eb";
+            const textColor = status === "not_started" ? "#9ca3af" : "white";
+
+            html += `<div class="absolute flex items-center" style="top:${milestoneIndex * 36 + 30}px; left:${left}%; width:${segmentWidth}%; padding: 0 2px;">
+                <div class="gantt-bar w-full" style="background:${barColor};">
+                    <span class="label" style="color:${textColor}">${info.title.substring(0, 25)}...</span>
+                </div>
+            </div>`;
+            milestoneIndex++;
+        });
+    });
+
+    html += '</div>';
+    document.getElementById('gantt-container').innerHTML = html;
+}
+
+// ========== INIT ==========
+renderTeamView();
+</script>
+</body>
+</html>

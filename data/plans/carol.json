@@ -1,0 +1,26 @@
+{
+  "member_id": "carol",
+  "plans": [
+    {
+      "plan_id": "carol-net-2026",
+      "template_id": "azure-networking",
+      "title": "Azure Networking Readiness",
+      "start_date": "2026-01-01",
+      "target_date": "2026-03-31",
+      "status": "in_progress",
+      "progress": [
+        { "milestone_id": "net-101", "status": "completed", "completed_date": "2026-01-12", "notes": "" },
+        { "milestone_id": "net-102", "status": "completed", "completed_date": "2026-01-20", "notes": "" },
+        { "milestone_id": "net-103", "status": "completed", "completed_date": "2026-01-25", "notes": "" },
+        { "milestone_id": "net-201", "status": "completed", "completed_date": "2026-02-15", "notes": "处理了 5 个 Case" },
+        { "milestone_id": "net-202", "status": "completed", "completed_date": "2026-02-22", "notes": "" },
+        { "milestone_id": "net-203", "status": "completed", "completed_date": "2026-03-01", "notes": "" },
+        { "milestone_id": "net-204", "status": "completed", "completed_date": "2026-02-10", "notes": "Shadow Emma" },
+        { "milestone_id": "net-301", "status": "completed", "completed_date": "2026-03-15", "notes": "AZ-700 已通过!" },
+        { "milestone_id": "net-302", "status": "completed", "completed_date": "2026-03-20", "notes": "写了 VPN TSG" },
+        { "milestone_id": "net-303", "status": "in_progress", "notes": "已处理 3 个" },
+        { "milestone_id": "net-304", "status": "not_started" }
+      ]
+    }
+  ]
+}

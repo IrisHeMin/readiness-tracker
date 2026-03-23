@@ -1,0 +1,41 @@
+{
+  "template_id": "azure-networking",
+  "title": "Azure Networking Readiness",
+  "description": "Azure 网络技术技能提升计划，涵盖基础到高级",
+  "estimated_weeks": 8,
+  "skill_dimensions": ["VNet & Subnet", "NSG & UDR", "VPN Gateway", "ExpressRoute", "DNS", "Load Balancer", "Firewall", "Network Watcher"],
+  "phases": [
+    {
+      "phase": 1,
+      "title": "基础概念 (Foundation)",
+      "duration_weeks": 2,
+      "milestones": [
+        { "id": "net-101", "title": "完成 Azure Networking 基础学习路径", "type": "learning", "weight": 1 },
+        { "id": "net-102", "title": "搭建 Hub-Spoke 网络实验环境", "type": "hands-on", "weight": 1 },
+        { "id": "net-103", "title": "完成 NSG/UDR 基础 Lab", "type": "hands-on", "weight": 1 }
+      ]
+    },
+    {
+      "phase": 2,
+      "title": "进阶实践 (Intermediate)",
+      "duration_weeks": 3,
+      "milestones": [
+        { "id": "net-201", "title": "独立处理 3 个 VNet Peering/Connectivity Case", "type": "case-practice", "weight": 2 },
+        { "id": "net-202", "title": "完成 VPN Gateway 排查 Lab", "type": "hands-on", "weight": 1 },
+        { "id": "net-203", "title": "完成 DNS 解析排查 Lab", "type": "hands-on", "weight": 1 },
+        { "id": "net-204", "title": "Shadow 一位 Senior 处理复杂 Case", "type": "mentoring", "weight": 1 }
+      ]
+    },
+    {
+      "phase": 3,
+      "title": "深度掌握 (Advanced)",
+      "duration_weeks": 3,
+      "milestones": [
+        { "id": "net-301", "title": "通过 AZ-700 认证", "type": "certification", "weight": 3 },
+        { "id": "net-302", "title": "输出一篇技术分享文档 (TSG/KB)", "type": "knowledge-sharing", "weight": 2 },
+        { "id": "net-303", "title": "独立处理 5 个高复杂度 Networking Case", "type": "case-practice", "weight": 2 },
+        { "id": "net-304", "title": "完成一次团队内部技术分享", "type": "presentation", "weight": 1 }
+      ]
+    }
+  ]
+}
