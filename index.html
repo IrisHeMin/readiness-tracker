@@ -45,6 +45,7 @@
             <span class="text-sm text-gray-500">📅 Last updated: 2026-03-23</span>
             <button onclick="showTab('team')" id="tab-team" class="px-4 py-2 text-sm tab-active">👥 Team Overview</button>
             <button onclick="showTab('individual')" id="tab-individual" class="px-4 py-2 text-sm text-gray-500 hover:text-blue-500">👤 Individual View</button>
+            <a href="my-plan.html" class="px-4 py-2 text-sm bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl hover:shadow-lg transition">🚀 My Plan</a>
         </div>
     </div>
 </header>
@@ -221,6 +222,23 @@ const plans = {
     }
 };
 
+// Merge localStorage shared progress (from my-plan.html) over defaults
+(function mergeSharedProgress() {
+    for (const memberId of Object.keys(plans)) {
+        try {
+            const shared = localStorage.getItem(`readiness-shared-${memberId}`);
+            if (shared) {
+                const data = JSON.parse(shared);
+                if (data.progress) {
+                    plans[memberId].progress = { ...plans[memberId].progress, ...data.progress };
+                    const allDone = Object.values(plans[memberId].progress).every(s => s === "completed");
+                    if (allDone) plans[memberId].status = "completed";
+                }
+            }
+        } catch(e) {}
+    }
+})();
+
 // ========== UTILITY FUNCTIONS ==========
 const statusColors = {
     completed: { bg: "bg-emerald-100", text: "text-emerald-700", border: "border-emerald-400", hex: "#10b981" },
@@ -303,7 +321,7 @@ function renderTeamView() {
     document.getElementById('progress-bars').innerHTML = sorted.map(m => {
         const statusLabel = plans[m.id].status === "completed" ? "✅ Completed" : m.pct < 20 ? "⚠️ Needs Attention" : "🔄 In Progress";
         const barColor = plans[m.id].status === "completed" ? "bg-emerald-500" : m.pct < 20 ? "bg-orange-400" : "bg-blue-500";
-        return `<div class="mb-4 cursor-pointer" onclick="showTab('individual'); document.getElementById('person-select').value='${m.id}'; renderIndividualView();">
+        return `<div class="mb-4 cursor-pointer" onclick="window.location.href='my-plan.html?id=${m.id}'">>
             <div class="flex items-center justify-between mb-1">
                 <div class="flex items-center gap-2">
                     <span class="text-sm font-semibold text-gray-700">${m.name}</span>

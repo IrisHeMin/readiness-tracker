@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Readiness Plan</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(255,255,255,0.88); backdrop-filter: blur(12px); }
+        .card-hover:hover { transform: translateY(-1px); box-shadow: 0 8px 25px rgba(0,0,0,0.08); }
+        .card-hover { transition: all 0.2s ease; }
+        .fade-in { animation: fadeIn 0.4s ease; }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes checkPop { 0% { transform:scale(1); } 50% { transform:scale(1.3); } 100% { transform:scale(1); } }
+        .check-pop { animation: checkPop 0.3s ease; }
+        .subtask-enter { animation: slideDown 0.25s ease; }
+        @keyframes slideDown { from { opacity:0; max-height:0; } to { opacity:1; max-height:60px; } }
+        .milestone-card { border-left: 4px solid; transition: all 0.2s ease; }
+        .milestone-card:hover { box-shadow: 0 4px 15px rgba(0,0,0,0.06); }
+        .progress-ring { transition: stroke-dashoffset 0.6s ease; }
+        .subtask-checkbox { appearance: none; width: 20px; height: 20px; border: 2px solid #d1d5db; border-radius: 6px; cursor: pointer; transition: all 0.2s; flex-shrink: 0; position: relative; }
+        .subtask-checkbox:checked { background: #10b981; border-color: #10b981; }
+        .subtask-checkbox:checked::after { content: '✓'; position: absolute; color: white; font-size: 12px; font-weight: bold; top: 50%; left: 50%; transform: translate(-50%,-50%); }
+        .subtask-checkbox:hover { border-color: #10b981; }
+        .milestone-checkbox { appearance: none; width: 26px; height: 26px; border: 2.5px solid #d1d5db; border-radius: 8px; cursor: pointer; transition: all 0.2s; flex-shrink: 0; position: relative; }
+        .milestone-checkbox:checked { background: linear-gradient(135deg, #10b981, #059669); border-color: #059669; }
+        .milestone-checkbox:checked::after { content: '✓'; position: absolute; color: white; font-size: 15px; font-weight: bold; top: 50%; left: 50%; transform: translate(-50%,-50%); }
+        .milestone-checkbox:hover { border-color: #059669; transform: scale(1.1); }
+        .subtask-text-done { text-decoration: line-through; color: #9ca3af; }
+        .tag { font-size: 0.65rem; padding: 2px 8px; border-radius: 9999px; font-weight: 600; }
+        .tooltip { position: relative; }
+        .tooltip:hover::after { content: attr(data-tip); position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.7rem; white-space: nowrap; z-index: 50; }
+        .phase-divider { position: relative; }
+        .phase-divider::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: linear-gradient(to right, transparent, #cbd5e1, transparent); }
+        .btn-add-subtask { transition: all 0.15s; }
+        .btn-add-subtask:hover { background: #eff6ff; color: #2563eb; }
+        input.subtask-input { outline: none; }
+        input.subtask-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+        .lock-icon { font-size: 0.7rem; opacity: 0.5; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-indigo-50 min-h-screen">
+
+<!-- Login Screen -->
+<div id="login-screen" class="min-h-screen flex items-center justify-center">
+    <div class="glass rounded-3xl shadow-xl p-10 max-w-md w-full text-center fade-in">
+        <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <svg class="w-9 h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+            </svg>
+        </div>
+        <h1 class="text-2xl font-bold text-gray-800 mb-2">My Readiness Plan</h1>
+        <p class="text-sm text-gray-500 mb-6">选择你的名字进入个人工作台</p>
+        <select id="login-select" class="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white shadow-sm text-base focus:ring-2 focus:ring-blue-300 outline-none mb-4">
+            <option value="">-- 选择你的名字 --</option>
+        </select>
+        <button onclick="doLogin()" class="w-full py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-xl hover:shadow-lg hover:scale-[1.02] transition-all">
+            进入我的计划 →
+        </button>
+        <a href="index.html" class="block mt-4 text-sm text-gray-400 hover:text-blue-500">← 返回团队总览</a>
+    </div>
+</div>
+
+<!-- Main Workspace -->
+<div id="workspace" class="hidden">
+    <!-- Header -->
+    <header class="bg-white/80 backdrop-filter backdrop-blur-md shadow-sm sticky top-0 z-50">
+        <div class="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-lg" id="avatar"></div>
+                <div>
+                    <h1 class="text-lg font-bold text-gray-800" id="header-name"></h1>
+                    <p class="text-xs text-gray-500" id="header-role"></p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="exportProgress()" class="px-4 py-2 text-sm bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition" data-tip="导出进度 JSON 给 Manager">📤 Export</button>
+                <a href="index.html" class="px-4 py-2 text-sm bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition">👥 Team View</a>
+                <button onclick="logout()" class="px-3 py-2 text-sm text-gray-400 hover:text-red-500 transition">退出</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-6 py-8">
+        <!-- Stats Row -->
+        <div class="grid grid-cols-5 gap-4 mb-8" id="stats-row"></div>
+
+        <!-- Privacy Notice -->
+        <div class="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 mb-6 flex items-center gap-2 text-sm text-blue-700">
+            <span>🔒</span>
+            <span>你的子任务拆分只有自己能看到，团队成员只能看到整体完成百分比。</span>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="grid grid-cols-3 gap-6 mb-8">
+            <div class="glass rounded-2xl shadow-lg p-5 card-hover">
+                <h3 class="text-sm font-semibold text-gray-600 mb-3">📊 Overall Progress</h3>
+                <div class="flex justify-center">
+                    <div class="relative w-36 h-36">
+                        <canvas id="progressDonut" width="144" height="144"></canvas>
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <span class="text-3xl font-bold text-gray-800" id="overall-pct-center">0%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="glass rounded-2xl shadow-lg p-5 card-hover">
+                <h3 class="text-sm font-semibold text-gray-600 mb-3">🎯 Phase Progress</h3>
+                <canvas id="phaseBar" height="140"></canvas>
+            </div>
+            <div class="glass rounded-2xl shadow-lg p-5 card-hover">
+                <h3 class="text-sm font-semibold text-gray-600 mb-3">📋 Milestone Status</h3>
+                <div id="status-summary" class="space-y-3 mt-2"></div>
+            </div>
+        </div>
+
+        <!-- Phase Sections with Milestones -->
+        <div id="plan-content"></div>
+    </main>
+</div>
+
+<!-- Export Modal -->
+<div id="export-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden z-[100] flex items-center justify-center">
+    <div class="glass rounded-2xl shadow-2xl p-8 max-w-lg w-full mx-4 fade-in">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold text-gray-800">📤 Export Progress</h2>
+            <button onclick="closeExportModal()" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+        </div>
+        <p class="text-sm text-gray-500 mb-3">复制下面的 JSON，更新到 <code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs">data/plans/你的名字.json</code> 文件并提交到 GitHub。</p>
+        <textarea id="export-json" readonly class="w-full h-64 p-4 bg-gray-900 text-green-400 rounded-xl text-xs font-mono focus:outline-none"></textarea>
+        <div class="flex gap-3 mt-4">
+            <button onclick="copyExportJSON()" class="flex-1 py-2.5 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition" id="copy-btn">📋 Copy to Clipboard</button>
+            <button onclick="closeExportModal()" class="px-6 py-2.5 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200 transition">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ========== DATA ==========
+const teamData = {
+    members: [
+        { id: "alice",  name: "Alice Wang",   role: "Support Engineer II",      focus_areas: ["Networking","DNS"] },
+        { id: "bob",    name: "Bob Zhang",    role: "Support Engineer",         focus_areas: ["Networking","VPN"] },
+        { id: "carol",  name: "Carol Li",     role: "Support Engineer II",      focus_areas: ["Storage","Networking"] },
+        { id: "dave",   name: "Dave Liu",     role: "Support Engineer",         focus_areas: ["Firewall","Networking"] },
+        { id: "emma",   name: "Emma Xu",      role: "Senior Support Engineer",  focus_areas: ["Load Balancer","Networking"] },
+        { id: "frank",  name: "Frank Zhao",   role: "Support Engineer",         focus_areas: ["Networking","ExpressRoute"] }
+    ]
+};
+
+const template = {
+    phases: [
+        { phase: 1, title: "基础概念 Foundation", icon: "📚", color: "blue", milestones: ["net-101","net-102","net-103"] },
+        { phase: 2, title: "进阶实践 Intermediate", icon: "🔧", color: "indigo", milestones: ["net-201","net-202","net-203","net-204"] },
+        { phase: 3, title: "深度掌握 Advanced", icon: "🏆", color: "purple", milestones: ["net-301","net-302","net-303","net-304"] }
+    ],
+    milestoneInfo: {
+        "net-101": { title: "完成 Azure Networking 基础学习路径", type: "learning", weight: 1, hint: "建议拆分: 各模块学习 + 笔记整理 + 测验通过" },
+        "net-102": { title: "搭建 Hub-Spoke 网络实验环境", type: "hands-on", weight: 1, hint: "建议拆分: VNet创建 + Peering配置 + 连通性测试" },
+        "net-103": { title: "完成 NSG/UDR 基础 Lab", type: "hands-on", weight: 1, hint: "建议拆分: NSG规则配置 + UDR路由配置 + 流量验证" },
+        "net-201": { title: "独立处理 3 个 VNet Connectivity Case", type: "case-practice", weight: 2, hint: "建议拆分: 每个 Case 单独一条" },
+        "net-202": { title: "完成 VPN Gateway 排查 Lab", type: "hands-on", weight: 1, hint: "建议拆分: S2S VPN + P2S VPN + 排查工具使用" },
+        "net-203": { title: "完成 DNS 解析排查 Lab", type: "hands-on", weight: 1, hint: "建议拆分: Public DNS + Private DNS + 条件转发" },
+        "net-204": { title: "Shadow Senior 处理复杂 Case", type: "mentoring", weight: 1, hint: "建议拆分: 观摩记录 + 排查思路总结 + Q&A" },
+        "net-301": { title: "通过 AZ-700 认证", type: "certification", weight: 3, hint: "建议拆分: 各章节学习 + 模拟考试 + 正式考试" },
+        "net-302": { title: "输出技术分享文档 (TSG/KB)", type: "knowledge-sharing", weight: 2, hint: "建议拆分: 选题 + 大纲 + 初稿 + Review + 发布" },
+        "net-303": { title: "独立处理 5 个高复杂度 Case", type: "case-practice", weight: 2, hint: "建议拆分: 每个 Case 单独一条" },
+        "net-304": { title: "完成团队内部技术分享", type: "presentation", weight: 1, hint: "建议拆分: 准备PPT + 演练 + 正式分享 + 收集反馈" }
+    }
+};
+
+const defaultPlans = {
+    alice:  { start_date:"2026-01-15", target_date:"2026-04-15", progress:{"net-101":"completed","net-102":"completed","net-103":"completed","net-201":"completed","net-202":"completed","net-203":"in_progress","net-204":"completed","net-301":"in_progress","net-302":"not_started","net-303":"in_progress","net-304":"not_started"} },
+    bob:    { start_date:"2026-02-01", target_date:"2026-05-01", progress:{"net-101":"completed","net-102":"completed","net-103":"in_progress","net-201":"not_started","net-202":"not_started","net-203":"not_started","net-204":"not_started","net-301":"not_started","net-302":"not_started","net-303":"not_started","net-304":"not_started"} },
+    carol:  { start_date:"2026-01-01", target_date:"2026-03-31", progress:{"net-101":"completed","net-102":"completed","net-103":"completed","net-201":"completed","net-202":"completed","net-203":"completed","net-204":"completed","net-301":"completed","net-302":"completed","net-303":"in_progress","net-304":"not_started"} },
+    dave:   { start_date:"2026-02-15", target_date:"2026-05-15", progress:{"net-101":"completed","net-102":"in_progress","net-103":"not_started","net-201":"not_started","net-202":"not_started","net-203":"not_started","net-204":"not_started","net-301":"not_started","net-302":"not_started","net-303":"not_started","net-304":"not_started"} },
+    emma:   { start_date:"2025-11-01", target_date:"2026-02-01", progress:{"net-101":"completed","net-102":"completed","net-103":"completed","net-201":"completed","net-202":"completed","net-203":"completed","net-204":"completed","net-301":"completed","net-302":"completed","net-303":"completed","net-304":"completed"} },
+    frank:  { start_date:"2026-03-01", target_date:"2026-06-01", progress:{"net-101":"in_progress","net-102":"not_started","net-103":"not_started","net-201":"not_started","net-202":"not_started","net-203":"not_started","net-204":"not_started","net-301":"not_started","net-302":"not_started","net-303":"not_started","net-304":"not_started"} }
+};
+
+const typeIcons = { learning:"📚", "hands-on":"🔧", "case-practice":"🎯", mentoring:"👥", certification:"🏆", "knowledge-sharing":"📝", presentation:"🎤" };
+
+let currentMember = null;
+let memberData = null; // { progress: {...}, subtasks: { "net-101": [{id,text,done},...], ... } }
+let progressDonutChart = null;
+let phaseBarChart = null;
+
+// ========== LOCAL STORAGE ==========
+function getStorageKey(memberId) { return `readiness-plan-${memberId}`; }
+
+function loadMemberData(memberId) {
+    const saved = localStorage.getItem(getStorageKey(memberId));
+    if (saved) {
+        return JSON.parse(saved);
+    }
+    // Initialize from default
+    const def = defaultPlans[memberId];
+    return {
+        progress: { ...def.progress },
+        subtasks: {},
+        start_date: def.start_date,
+        target_date: def.target_date
+    };
+}
+
+function saveMemberData() {
+    if (!currentMember) return;
+    localStorage.setItem(getStorageKey(currentMember.id), JSON.stringify(memberData));
+    // Also save milestone-level progress to a shared key (for team dashboard)
+    const sharedProgress = {};
+    for (const [mid, status] of Object.entries(memberData.progress)) {
+        sharedProgress[mid] = status;
+    }
+    localStorage.setItem(`readiness-shared-${currentMember.id}`, JSON.stringify({
+        progress: sharedProgress,
+        lastUpdated: new Date().toISOString()
+    }));
+}
+
+// ========== LOGIN ==========
+function initLogin() {
+    const params = new URLSearchParams(window.location.search);
+    const preselect = params.get('id');
+    const sel = document.getElementById('login-select');
+    teamData.members.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = `${m.name} — ${m.role}`;
+        if (preselect === m.id) opt.selected = true;
+        sel.appendChild(opt);
+    });
+    // Auto-login if id param provided
+    if (preselect && teamData.members.find(m => m.id === preselect)) {
+        doLogin();
+    }
+}
+
+function doLogin() {
+    const sel = document.getElementById('login-select');
+    const memberId = sel.value;
+    if (!memberId) return;
+    currentMember = teamData.members.find(m => m.id === memberId);
+    memberData = loadMemberData(memberId);
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('workspace').classList.remove('hidden');
+    document.getElementById('avatar').textContent = currentMember.name.charAt(0);
+    document.getElementById('header-name').textContent = currentMember.name;
+    document.getElementById('header-role').textContent = `${currentMember.role} · ${currentMember.focus_areas.join(', ')}`;
+    renderWorkspace();
+}
+
+function logout() {
+    currentMember = null;
+    memberData = null;
+    document.getElementById('login-screen').classList.remove('hidden');
+    document.getElementById('workspace').classList.add('hidden');
+    window.history.replaceState({}, '', 'my-plan.html');
+}
+
+// ========== PROGRESS CALCULATION ==========
+function calcWeightedProgress() {
+    let totalW = 0, doneW = 0;
+    for (const [mid, status] of Object.entries(memberData.progress)) {
+        const w = template.milestoneInfo[mid]?.weight || 1;
+        totalW += w;
+        if (status === "completed") doneW += w;
+        else if (status === "in_progress") doneW += w * 0.5;
+    }
+    return totalW === 0 ? 0 : Math.round((doneW / totalW) * 100);
+}
+
+function calcPhaseProgress(phaseNum) {
+    const phase = template.phases.find(p => p.phase === phaseNum);
+    let total = 0, done = 0;
+    phase.milestones.forEach(mid => {
+        total++;
+        const s = memberData.progress[mid];
+        if (s === "completed") done++;
+        else if (s === "in_progress") done += 0.5;
+    });
+    return total === 0 ? 0 : Math.round((done / total) * 100);
+}
+
+function getSubtaskProgress(mid) {
+    const subs = memberData.subtasks[mid] || [];
+    if (subs.length === 0) return null;
+    const done = subs.filter(s => s.done).length;
+    return { done, total: subs.length, pct: Math.round((done / subs.length) * 100) };
+}
+
+// ========== MILESTONE STATUS TOGGLE ==========
+function toggleMilestone(mid) {
+    const current = memberData.progress[mid];
+    if (current === "not_started") memberData.progress[mid] = "in_progress";
+    else if (current === "in_progress") memberData.progress[mid] = "completed";
+    else memberData.progress[mid] = "not_started";
+    saveMemberData();
+    renderWorkspace();
+}
+
+function setMilestoneStatus(mid, status) {
+    memberData.progress[mid] = status;
+    saveMemberData();
+    renderWorkspace();
+}
+
+// ========== SUBTASK MANAGEMENT ==========
+function addSubtask(mid) {
+    const input = document.getElementById(`subtask-input-${mid}`);
+    const text = input.value.trim();
+    if (!text) return;
+    if (!memberData.subtasks[mid]) memberData.subtasks[mid] = [];
+    memberData.subtasks[mid].push({ id: Date.now().toString(), text, done: false });
+    input.value = '';
+    // Auto-set milestone to in_progress if was not_started
+    if (memberData.progress[mid] === "not_started") {
+        memberData.progress[mid] = "in_progress";
+    }
+    saveMemberData();
+    renderMilestoneCard(mid);
+    updateCharts();
+    updateStats();
+}
+
+function toggleSubtask(mid, subtaskId) {
+    const subs = memberData.subtasks[mid];
+    const sub = subs.find(s => s.id === subtaskId);
+    if (sub) sub.done = !sub.done;
+    // Auto-update milestone status
+    const allDone = subs.length > 0 && subs.every(s => s.done);
+    const anyDone = subs.some(s => s.done);
+    if (allDone) memberData.progress[mid] = "completed";
+    else if (anyDone) memberData.progress[mid] = "in_progress";
+    else memberData.progress[mid] = memberData.subtasks[mid]?.length > 0 ? "in_progress" : "not_started";
+    saveMemberData();
+    renderMilestoneCard(mid);
+    updateCharts();
+    updateStats();
+}
+
+function deleteSubtask(mid, subtaskId) {
+    memberData.subtasks[mid] = (memberData.subtasks[mid] || []).filter(s => s.id !== subtaskId);
+    if (memberData.subtasks[mid].length === 0) delete memberData.subtasks[mid];
+    saveMemberData();
+    renderMilestoneCard(mid);
+    updateCharts();
+    updateStats();
+}
+
+// ========== RENDERING ==========
+function renderWorkspace() {
+    renderStats();
+    renderCharts();
+    renderPlanContent();
+}
+
+function updateStats() { renderStats(); }
+
+function renderStats() {
+    const overall = calcWeightedProgress();
+    const completed = Object.values(memberData.progress).filter(s => s === "completed").length;
+    const inProgress = Object.values(memberData.progress).filter(s => s === "in_progress").length;
+    const notStarted = Object.values(memberData.progress).filter(s => s === "not_started").length;
+    const total = Object.keys(memberData.progress).length;
+    const totalSubtasks = Object.values(memberData.subtasks).reduce((s, arr) => s + arr.length, 0);
+    const doneSubtasks = Object.values(memberData.subtasks).reduce((s, arr) => s + arr.filter(t => t.done).length, 0);
+
+    document.getElementById('stats-row').innerHTML = `
+        <div class="glass rounded-xl shadow p-4 card-hover text-center">
+            <p class="text-xs text-gray-500 mb-1">Overall</p>
+            <p class="text-2xl font-bold ${overall >= 75 ? 'text-emerald-600' : overall >= 40 ? 'text-blue-600' : 'text-orange-500'}">${overall}%</p>
+        </div>
+        <div class="glass rounded-xl shadow p-4 card-hover text-center">
+            <p class="text-xs text-gray-500 mb-1">✅ Milestones Done</p>
+            <p class="text-2xl font-bold text-emerald-600">${completed}<span class="text-sm font-normal text-gray-400">/${total}</span></p>
+        </div>
+        <div class="glass rounded-xl shadow p-4 card-hover text-center">
+            <p class="text-xs text-gray-500 mb-1">🔄 In Progress</p>
+            <p class="text-2xl font-bold text-blue-500">${inProgress}</p>
+        </div>
+        <div class="glass rounded-xl shadow p-4 card-hover text-center">
+            <p class="text-xs text-gray-500 mb-1">🔒 Sub-tasks</p>
+            <p class="text-2xl font-bold text-gray-700">${doneSubtasks}<span class="text-sm font-normal text-gray-400">/${totalSubtasks}</span></p>
+        </div>
+        <div class="glass rounded-xl shadow p-4 card-hover text-center">
+            <p class="text-xs text-gray-500 mb-1">📅 Target</p>
+            <p class="text-lg font-bold text-gray-700">${memberData.target_date}</p>
+        </div>`;
+}
+
+function renderCharts() { updateCharts(); }
+
+function updateCharts() {
+    const overall = calcWeightedProgress();
+    const completed = Object.values(memberData.progress).filter(s => s === "completed").length;
+    const inProgress = Object.values(memberData.progress).filter(s => s === "in_progress").length;
+    const notStarted = Object.values(memberData.progress).filter(s => s === "not_started").length;
+
+    // Donut
+    if (progressDonutChart) progressDonutChart.destroy();
+    const ctx1 = document.getElementById('progressDonut').getContext('2d');
+    progressDonutChart = new Chart(ctx1, {
+        type: 'doughnut',
+        data: {
+            labels: ['Completed', 'In Progress', 'Not Started'],
+            datasets: [{ data: [completed, inProgress, notStarted], backgroundColor: ['#10b981','#3b82f6','#e5e7eb'], borderWidth: 0, hoverOffset: 5 }]
+        },
+        options: { responsive: true, cutout: '72%', plugins: { legend: { display: false }, tooltip: { enabled: true } } }
+    });
+    document.getElementById('overall-pct-center').textContent = overall + '%';
+
+    // Phase bar
+    if (phaseBarChart) phaseBarChart.destroy();
+    const ctx2 = document.getElementById('phaseBar').getContext('2d');
+    const phaseColors = ['#93c5fd','#818cf8','#a78bfa'];
+    phaseBarChart = new Chart(ctx2, {
+        type: 'bar',
+        data: {
+            labels: template.phases.map(p => `P${p.phase}`),
+            datasets: [{ data: template.phases.map(p => calcPhaseProgress(p.phase)), backgroundColor: phaseColors, borderRadius: 6, barThickness: 36 }]
+        },
+        options: {
+            responsive: true, indexAxis: 'y',
+            scales: { x: { beginAtZero: true, max: 100, ticks: { callback: v => v+'%' }, grid: { color:'#f1f5f9' } }, y: { grid: { display: false } } },
+            plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.parsed.x + '%' } } }
+        }
+    });
+
+    // Status summary
+    document.getElementById('status-summary').innerHTML = `
+        <div class="flex items-center justify-between"><span class="flex items-center gap-2 text-sm"><span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span> Completed</span><span class="text-sm font-bold text-gray-700">${completed}</span></div>
+        <div class="flex items-center justify-between"><span class="flex items-center gap-2 text-sm"><span class="w-3 h-3 rounded-full bg-blue-500 inline-block"></span> In Progress</span><span class="text-sm font-bold text-gray-700">${inProgress}</span></div>
+        <div class="flex items-center justify-between"><span class="flex items-center gap-2 text-sm"><span class="w-3 h-3 rounded-full bg-gray-300 inline-block"></span> Not Started</span><span class="text-sm font-bold text-gray-700">${notStarted}</span></div>
+        <div class="border-t pt-2 mt-1 flex items-center justify-between"><span class="text-sm text-gray-500">Total Milestones</span><span class="text-sm font-bold text-gray-700">${completed + inProgress + notStarted}</span></div>`;
+}
+
+function renderPlanContent() {
+    const container = document.getElementById('plan-content');
+    container.innerHTML = template.phases.map(phase => {
+        const phasePct = calcPhaseProgress(phase.phase);
+        return `
+        <div class="mb-8 fade-in">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="text-2xl">${phase.icon}</span>
+                <h2 class="text-lg font-bold text-gray-800">Phase ${phase.phase}: ${phase.title}</h2>
+                <div class="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden ml-2">
+                    <div class="h-2 rounded-full transition-all duration-700 ${phasePct>=100?'bg-emerald-500':phasePct>=50?'bg-blue-500':'bg-blue-300'}" style="width:${phasePct}%"></div>
+                </div>
+                <span class="text-sm font-bold ${phasePct>=100?'text-emerald-600':'text-gray-500'}">${phasePct}%</span>
+            </div>
+            <div class="space-y-3 ml-4" id="phase-${phase.phase}-milestones">
+                ${phase.milestones.map(mid => buildMilestoneCardHTML(mid)).join('')}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function renderMilestoneCard(mid) {
+    const el = document.getElementById(`milestone-${mid}`);
+    if (el) {
+        el.outerHTML = buildMilestoneCardHTML(mid);
+    }
+}
+
+function buildMilestoneCardHTML(mid) {
+    const info = template.milestoneInfo[mid];
+    const status = memberData.progress[mid];
+    const subs = memberData.subtasks[mid] || [];
+    const subProgress = getSubtaskProgress(mid);
+    const icon = typeIcons[info.type] || "📌";
+
+    const borderColor = status === "completed" ? "border-emerald-400" : status === "in_progress" ? "border-blue-400" : "border-gray-200";
+    const bgColor = status === "completed" ? "bg-emerald-50/50" : status === "in_progress" ? "bg-blue-50/30" : "bg-white";
+    const statusBadge = status === "completed"
+        ? '<span class="tag bg-emerald-100 text-emerald-700">✅ COMPLETED</span>'
+        : status === "in_progress"
+        ? '<span class="tag bg-blue-100 text-blue-700">🔄 IN PROGRESS</span>'
+        : '<span class="tag bg-gray-100 text-gray-500">⬜ NOT STARTED</span>';
+
+    let subtaskHTML = '';
+    if (subs.length > 0) {
+        subtaskHTML = `<div class="mt-3 ml-8 space-y-1.5">` +
+            subs.map(s => `
+                <div class="flex items-center gap-2 group subtask-enter">
+                    <input type="checkbox" class="subtask-checkbox" ${s.done ? 'checked' : ''} onchange="toggleSubtask('${mid}','${s.id}')">
+                    <span class="text-sm flex-1 ${s.done ? 'subtask-text-done' : 'text-gray-700'}">${escapeHtml(s.text)}</span>
+                    <button onclick="deleteSubtask('${mid}','${s.id}')" class="text-gray-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition text-xs px-1">✕</button>
+                </div>`).join('') +
+            `</div>`;
+    }
+
+    const subProgressBar = subProgress ? `
+        <div class="mt-2 ml-8 flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden"><div class="h-1.5 bg-emerald-400 rounded-full transition-all" style="width:${subProgress.pct}%"></div></div>
+            <span class="text-xs text-gray-400">${subProgress.done}/${subProgress.total}</span>
+        </div>` : '';
+
+    return `
+    <div id="milestone-${mid}" class="milestone-card ${borderColor} ${bgColor} rounded-xl p-4">
+        <div class="flex items-start gap-3">
+            <input type="checkbox" class="milestone-checkbox mt-0.5" ${status === 'completed' ? 'checked' : ''} 
+                onclick="event.stopPropagation(); setMilestoneStatus('${mid}', this.checked ? 'completed' : 'not_started')">
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-base">${icon}</span>
+                    <span class="text-sm font-semibold text-gray-800">${info.title}</span>
+                    ${statusBadge}
+                    <span class="tag bg-gray-100 text-gray-500">${info.type}</span>
+                    <span class="tag bg-gray-100 text-gray-500">×${info.weight}</span>
+                </div>
+                ${subtaskHTML}
+                ${subProgressBar}
+                <!-- Add subtask input -->
+                <div class="mt-3 ml-8 flex items-center gap-2">
+                    <input id="subtask-input-${mid}" type="text" placeholder="${subs.length === 0 ? '💡 ' + info.hint : '➕ 添加子任务...'}"
+                        class="subtask-input flex-1 text-sm px-3 py-1.5 border border-gray-200 rounded-lg bg-white/70"
+                        onkeydown="if(event.key==='Enter')addSubtask('${mid}')">
+                    <button onclick="addSubtask('${mid}')" class="btn-add-subtask text-sm px-3 py-1.5 rounded-lg text-gray-400 border border-gray-200">Add</button>
+                    <span class="lock-icon" title="子任务仅自己可见">🔒</span>
+                </div>
+            </div>
+        </div>
+    </div>`;
+}
+
+// ========== EXPORT ==========
+function exportProgress() {
+    const exportData = {
+        member_id: currentMember.id,
+        plans: [{
+            plan_id: `${currentMember.id}-net-2026`,
+            template_id: "azure-networking",
+            title: "Azure Networking Readiness",
+            start_date: memberData.start_date,
+            target_date: memberData.target_date,
+            status: Object.values(memberData.progress).every(s => s === "completed") ? "completed" : "in_progress",
+            progress: Object.entries(memberData.progress).map(([mid, status]) => ({
+                milestone_id: mid,
+                status: status,
+                notes: ""
+            }))
+        }]
+    };
+    document.getElementById('export-json').value = JSON.stringify(exportData, null, 2);
+    document.getElementById('export-modal').classList.remove('hidden');
+}
+
+function copyExportJSON() {
+    const textarea = document.getElementById('export-json');
+    navigator.clipboard.writeText(textarea.value).then(() => {
+        const btn = document.getElementById('copy-btn');
+        btn.textContent = '✅ Copied!';
+        setTimeout(() => btn.textContent = '📋 Copy to Clipboard', 2000);
+    });
+}
+
+function closeExportModal() {
+    document.getElementById('export-modal').classList.add('hidden');
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// ========== INIT ==========
+initLogin();
+</script>
+</body>
+</html>
