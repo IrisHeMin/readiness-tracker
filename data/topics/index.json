@@ -5,5 +5,8 @@
   {"id": "storage-filesystems", "title": "📁 NTFS & ReFS Filesystems", "description": "Filesystem internals, NTFS vs ReFS comparison, USB block policies, corruption recovery, and filesystem troubleshooting.", "levels": 3},
   {"id": "storage-csv", "title": "📊 Cluster Shared Volumes (CSV)", "description": "CSV architecture, direct I/O vs redirected I/O, CSV cache, troubleshooting CSV issues in failover clusters.", "levels": 3},
   {"id": "storage-spaces", "title": "🏗️ Storage Spaces & S2D", "description": "Storage Spaces fundamentals, Storage Spaces Direct (S2D), pool management, resiliency types, and troubleshooting.", "levels": 3},
-  {"id": "storage-dedup-fsrm", "title": "♻️ Deduplication & FSRM", "description": "Data Deduplication optimization, File Server Resource Manager quotas/screens, and storage efficiency management.", "levels": 3}
+  {"id": "storage-dedup-fsrm", "title": "♻️ Deduplication & FSRM", "description": "Data Deduplication optimization, File Server Resource Manager quotas/screens, and storage efficiency management.", "levels": 3},
+  {"id": "hyperv-livemigration", "title": "🔄 Hyper-V Live Migration", "description": "Master Live Migration fundamentals, troubleshooting migration failures, and performance optimization across hosts.", "levels": 3},
+  {"id": "hyperv-shieldedvm", "title": "🔒 Hyper-V Shielded VMs", "description": "Understand Host Guardian Service, attestation modes, and how to protect VMs from compromised fabric admins.", "levels": 3},
+  {"id": "hyperv-fundamentals", "title": "💻 Virtualization & Hyper-V", "description": "Core Hyper-V architecture, VM management, virtual networking, and storage fundamentals for support engineers.", "levels": 3}
 ]

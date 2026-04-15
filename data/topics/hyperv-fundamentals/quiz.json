@@ -1,0 +1,134 @@
+{
+  "L100": [
+    {
+      "id": "L100-Q1",
+      "scenario": "A junior admin creates a new VM and selects Generation 1. They want to enable Secure Boot and boot from a SCSI-attached VHDX. The VM fails to boot from the SCSI disk.",
+      "question": "What is the root cause and what should they do?",
+      "choices": [
+        "A) The VHDX file is corrupted — run Test-VHD to repair it",
+        "B) Gen 1 VMs cannot boot from SCSI and do not support Secure Boot — recreate as Gen 2",
+        "C) SCSI boot requires a special driver to be injected into the VHDX first",
+        "D) Secure Boot is blocking the SCSI controller — disable Secure Boot and retry"
+      ],
+      "correct": "B",
+      "explanation": "Generation 1 VMs use legacy BIOS firmware and can only boot from IDE controllers. They also do not support Secure Boot or UEFI. Generation 2 VMs use UEFI firmware, support Secure Boot natively, and boot from SCSI controllers. The VM must be recreated as Gen 2 — you cannot convert a Gen 1 VM to Gen 2 in place.",
+      "followup_tip": "Always use Gen 2 for new VMs: New-VM -Name 'MyVM' -Generation 2 -MemoryStartupBytes 4GB -NewVHDPath 'C:\\VMs\\MyVM.vhdx' -NewVHDSizeBytes 60GB"
+    },
+    {
+      "id": "L100-Q2",
+      "scenario": "A customer reports that their Hyper-V VMs can talk to each other but cannot reach the physical network or the internet. The host itself has full network connectivity.",
+      "question": "What is the most likely virtual switch configuration issue?",
+      "choices": [
+        "A) The VMs are connected to an External switch but the physical NIC driver is outdated",
+        "B) The VMs are connected to a Private switch which only allows VM-to-VM traffic",
+        "C) The VMs are connected to an Internal switch which allows VM-to-Host but not external traffic",
+        "D) The Hyper-V Virtual Switch service (vmswitch) has crashed"
+      ],
+      "correct": "C",
+      "explanation": "An Internal switch allows communication between VMs and the host, but not to the external physical network. A Private switch would not allow host communication at all. Since VMs can talk to each other (and presumably the host could too), this points to an Internal switch. An External switch bound to a physical NIC is needed for full network access.",
+      "followup_tip": "Check switch type: Get-VMSwitch | Format-Table Name, SwitchType — then create an External switch: New-VMSwitch -Name 'ExtSwitch' -NetAdapterName 'Ethernet' -AllowManagementOS $true"
+    },
+    {
+      "id": "L100-Q3",
+      "scenario": "After a power outage, a domain controller VM running on Hyper-V comes back online but domain-joined machines report Kerberos authentication failures with clock skew errors.",
+      "question": "Which Integration Service is most relevant to this issue?",
+      "choices": [
+        "A) Heartbeat service — the host did not detect the VM was unresponsive",
+        "B) Guest Shutdown service — the VM was not shut down gracefully",
+        "C) Time Synchronization service — the VM clock drifted during the outage",
+        "D) Key-Value Pair Exchange — the host could not pass time data to the guest"
+      ],
+      "correct": "C",
+      "explanation": "The Hyper-V Time Synchronization integration service keeps the guest clock synchronized with the host. After a power outage or restore from saved state, the VM clock can drift significantly. Kerberos has a default 5-minute tolerance for clock skew. The Time Sync IC should re-synchronize the clock, but if it's disabled or not functioning, manual time correction or w32tm resync is needed.",
+      "followup_tip": "Check IC status: Get-VMIntegrationService -VMName 'DC01' -Name 'Time Synchronization' — Note: For DCs, best practice is to disable Hyper-V time sync and use an external NTP source."
+    },
+    {
+      "id": "L100-Q4",
+      "scenario": "You need to set up an isolated lab environment on a Hyper-V host where 5 VMs can communicate with each other for testing, but they must not have any connectivity to the host OS or the production network.",
+      "question": "Which virtual switch type should you create?",
+      "choices": [
+        "A) External switch with VLAN tagging to isolate traffic",
+        "B) Internal switch with Windows Firewall rules blocking host traffic",
+        "C) Private switch for complete VM-to-VM isolation",
+        "D) External switch with AllowManagementOS set to $false"
+      ],
+      "correct": "C",
+      "explanation": "A Private virtual switch provides complete isolation — VMs connected to it can communicate with each other but have zero connectivity to the host OS or external network. This is ideal for lab/test environments. An Internal switch would still allow host-to-VM communication. An External switch (even without management OS access) binds to a physical NIC and could route traffic externally.",
+      "followup_tip": "Create an isolated lab switch: New-VMSwitch -Name 'LabSwitch' -SwitchType Private — then connect VMs: Connect-VMNetworkAdapter -VMName 'LabVM1' -SwitchName 'LabSwitch'"
+    }
+  ],
+  "L200": [
+    {
+      "id": "L200-Q1",
+      "scenario": "A customer's VM fails to start with the error 'The chain of virtual hard disks is broken.' The VM was working fine before the storage team reorganized the file share and moved some VHD files to new folders.",
+      "question": "What is the most likely cause and how should you fix it?",
+      "choices": [
+        "A) The VHDX file is corrupted from the move — restore from backup",
+        "B) A differencing disk lost its parent VHD reference when files were moved — use Set-VHD to fix the parent path",
+        "C) The VM configuration file needs to be regenerated — delete and re-import the VM",
+        "D) NTFS permissions were lost during the move — re-ACL the VHD files"
+      ],
+      "correct": "B",
+      "explanation": "Differencing disks (used by checkpoints/snapshots) store an absolute path to their parent VHD. When the parent is moved to a new location, the chain breaks because the child disk can no longer find its parent at the old path. The fix is to update the parent path reference in the differencing disk using Set-VHD.",
+      "followup_tip": "Fix the broken chain: Get-VHD -Path 'C:\\VMs\\child.avhdx' | Select ParentPath — then: Set-VHD -Path 'C:\\VMs\\child.avhdx' -ParentPath 'D:\\NewPath\\parent.vhdx'"
+    },
+    {
+      "id": "L200-Q2",
+      "scenario": "Multiple VMs on a Hyper-V host intermittently lose network connectivity. The issue started after a NIC firmware update. The host itself maintains connectivity. Restarting the affected VMs temporarily resolves the issue.",
+      "question": "What should you check first?",
+      "choices": [
+        "A) Check if the virtual switch was accidentally changed to Internal type",
+        "B) Disable VMQ on the physical NIC as firmware bugs commonly cause VMQ-related packet drops",
+        "C) Replace the physical NIC — the firmware update corrupted the hardware",
+        "D) Increase the VM network adapter bandwidth reservation to guarantee throughput"
+      ],
+      "correct": "B",
+      "explanation": "Virtual Machine Queue (VMQ) offloads traffic processing to dedicated hardware queues on the NIC. NIC firmware bugs are a well-known cause of VMQ-related issues including intermittent packet drops, black-holed traffic, and connectivity loss for VMs. Disabling VMQ is the standard first troubleshooting step. The host stays connected because host traffic uses a different code path.",
+      "followup_tip": "Disable VMQ: Set-NetAdapterVmq -Name 'Ethernet' -Enabled $false — also check RSS: Get-NetAdapterRss -Name 'Ethernet' — and verify: Get-NetAdapterVmqQueue -Name 'Ethernet'"
+    },
+    {
+      "id": "L200-Q3",
+      "scenario": "A customer takes a checkpoint of their production SQL Server VM before applying patches. After patching, they revert to the checkpoint. The SQL databases come back online but show transaction log inconsistencies and some recent data appears missing.",
+      "question": "What type of checkpoint was used and what should they use instead?",
+      "choices": [
+        "A) A Production checkpoint was used — switch to Standard checkpoints for database servers",
+        "B) A Standard checkpoint was used — it captured raw memory state, not application-consistent disk. Use Production checkpoints instead",
+        "C) The checkpoint was fine but the VHDX merge after revert caused data corruption",
+        "D) SQL Server's own recovery process conflicted with the checkpoint restore — disable auto-recovery"
+      ],
+      "correct": "B",
+      "explanation": "Standard checkpoints capture the VM's memory and disk state at a point in time (like freezing mid-operation). When restored, in-flight SQL transactions are in an inconsistent state. Production checkpoints use VSS (Volume Shadow Copy Service) to create application-consistent snapshots — SQL Server flushes its buffers and writes a consistent checkpoint before the snapshot. This is the correct approach for production workloads.",
+      "followup_tip": "Switch to production checkpoints: Set-VM -Name 'SQL-VM' -CheckpointType Production — or use ProductionOnly to fail rather than fall back to standard: Set-VM -Name 'SQL-VM' -CheckpointType ProductionOnly"
+    }
+  ],
+  "L300": [
+    {
+      "id": "L300-Q1",
+      "scenario": "You're performance-tuning a SQL Server VM on a 2-socket Hyper-V host (each socket has 16 cores and 64 GB local RAM). The VM is configured with 24 vCPUs and 96 GB RAM. Performance monitoring shows high memory latency and inconsistent query times.",
+      "question": "What is the most likely cause and how should you optimize it?",
+      "choices": [
+        "A) The VM has too many vCPUs — reduce to 16 to match a single socket",
+        "B) The VM is spanning two NUMA nodes causing cross-node memory access penalties — right-size it to fit within one NUMA node",
+        "C) Dynamic Memory is causing memory ballooning — switch to static memory allocation",
+        "D) The VHDX is on a slow storage tier — move to NVMe storage"
+      ],
+      "correct": "B",
+      "explanation": "With 24 vCPUs and 96 GB RAM, the VM exceeds what a single NUMA node can provide (16 cores / 64 GB). The hypervisor must span the VM across both NUMA nodes. Cross-node memory access (remote NUMA) has significantly higher latency than local access. For optimal SQL performance, the VM should be sized to fit within one NUMA node: max 16 vCPUs and 64 GB RAM. Alternatively, configure NUMA topology awareness in SQL Server.",
+      "followup_tip": "Check NUMA: Get-VMHostNumaNode — Right-size VM: Set-VMProcessor -VMName 'SQL-VM' -MaximumCountPerNumaNode 16 — Disable NUMA spanning host-wide: Set-VMHost -NumaSpanningEnabled $false"
+    },
+    {
+      "id": "L300-Q2",
+      "scenario": "You need to enable nested virtualization on a Hyper-V VM so a training lab can run Hyper-V inside the VM. After enabling ExposeVirtualizationExtensions, the nested VMs are created successfully but have no network connectivity.",
+      "question": "What additional configuration is needed?",
+      "choices": [
+        "A) Install a legacy network adapter in the nested VMs for compatibility",
+        "B) Enable MAC address spoofing on the L1 VM's network adapter so nested VM traffic can use different MAC addresses",
+        "C) Create an External virtual switch inside the nested host and bind it to the synthetic NIC",
+        "D) Nested VMs cannot have network connectivity — use Copy-VMFile for data transfer"
+      ],
+      "correct": "B",
+      "explanation": "In nested virtualization, the L2 (nested) VMs generate network traffic with their own MAC addresses. By default, the physical host's virtual switch drops frames with MAC addresses that don't match the L1 VM's assigned MAC. Enabling MAC address spoofing on the L1 VM's network adapter allows frames with any source MAC to pass through, giving nested VMs network connectivity.",
+      "followup_tip": "Enable MAC spoofing on the L1 VM (must be off): Set-VMNetworkAdapter -VMName 'LabHost' -MacAddressSpoofing On — Also ensure nested virt is on: Set-VMProcessor -VMName 'LabHost' -ExposeVirtualizationExtensions $true"
+    }
+  ]
+}

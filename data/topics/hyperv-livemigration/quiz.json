@@ -1,0 +1,134 @@
+{
+  "L100": [
+    {
+      "id": "L100-Q1",
+      "scenario": "A customer wants to move a running VM from Host-A to Host-B during business hours. Both hosts are standalone (no cluster) and use local storage. The customer says they cannot afford any downtime for the VM.",
+      "question": "What type of migration should you recommend?",
+      "choices": [
+        "A) Quick Migration — it saves and restores state quickly",
+        "B) Storage Migration — it moves the VHDs with no downtime",
+        "C) Shared Nothing Live Migration — it moves both compute and storage with near-zero downtime",
+        "D) Export and Import — it creates a portable copy of the VM"
+      ],
+      "correct": "C",
+      "explanation": "Shared Nothing Live Migration can move a running VM and its storage between standalone hosts with near-zero downtime (millisecond blackout window). Quick Migration requires a brief pause (seconds to minutes). Storage Migration only moves VHDs, not the running compute. Export/Import requires the VM to be stopped.",
+      "followup_tip": "Use: Move-VM -Name 'MyVM' -DestinationHost 'Host-B' -IncludeStorage -DestinationStoragePath 'D:\\VMs\\MyVM'"
+    },
+    {
+      "id": "L100-Q2",
+      "scenario": "A customer has two Hyper-V hosts — one with an Intel Xeon E5-2680v3 and the other with an Intel Xeon Gold 6248. They attempt to Live Migrate a VM between them but receive a processor compatibility error.",
+      "question": "What should you advise the customer to do?",
+      "choices": [
+        "A) Upgrade the BIOS on both hosts to the latest version",
+        "B) Enable Processor Compatibility mode on the VM (requires VM shutdown)",
+        "C) Switch from CredSSP to Kerberos authentication",
+        "D) Move the VM to shared storage first, then migrate"
+      ],
+      "correct": "B",
+      "explanation": "When migrating between different processor generations of the same vendor (both Intel), enabling Processor Compatibility mode limits the CPU features exposed to the VM to a common subset. This requires a VM shutdown to change the setting, but after that, Live Migration will work between the hosts.",
+      "followup_tip": "Use: Set-VMProcessor -VMName 'MyVM' -CompatibilityForMigrationEnabled $true (VM must be off)"
+    },
+    {
+      "id": "L100-Q3",
+      "scenario": "A customer is setting up Live Migration between two Hyper-V hosts. They want to manage migrations remotely from their admin workstation using PowerShell Remoting. They currently have CredSSP configured.",
+      "question": "What issue will they encounter?",
+      "choices": [
+        "A) PowerShell Remoting does not support Live Migration commands",
+        "B) CredSSP cannot forward credentials from the admin workstation to the source host to the destination host (double-hop problem)",
+        "C) Live Migration requires the Failover Clustering feature to be installed",
+        "D) CredSSP only works with Windows Server 2019 and newer"
+      ],
+      "correct": "B",
+      "explanation": "CredSSP authentication delegates the admin's credentials from their workstation to the source host (hop 1), but cannot forward them again from the source to the destination host (hop 2). This 'double-hop' problem means migration commands initiated from a remote machine will fail with an authentication error. Kerberos constrained delegation is needed for this scenario.",
+      "followup_tip": "Switch to Kerberos: Set-VMHost -VirtualMachineMigrationAuthenticationType Kerberos — then configure AD constrained delegation for host computer accounts."
+    },
+    {
+      "id": "L100-Q4",
+      "scenario": "A customer reports that Live Migration works but is extremely slow — a VM with 32 GB of memory takes over 20 minutes to migrate between hosts. Both hosts are connected via a 1 Gbps management NIC and a 10 Gbps NIC on a separate subnet.",
+      "question": "What is the most likely cause and fix?",
+      "choices": [
+        "A) The VM has too many snapshots — delete them before migrating",
+        "B) Live Migration is using the 1 Gbps management NIC instead of the 10 Gbps dedicated NIC",
+        "C) The destination host does not have enough free memory",
+        "D) CredSSP encryption is causing overhead — switch to Kerberos"
+      ],
+      "correct": "B",
+      "explanation": "If no migration network is explicitly configured, Hyper-V may use the management NIC (1 Gbps) for migration traffic instead of the faster 10 Gbps NIC. At 1 Gbps, 32 GB would take approximately 4+ minutes for just the initial copy, and with dirty pages the total can easily exceed 20 minutes. Configuring the 10 Gbps subnet as a migration network will dramatically improve speed.",
+      "followup_tip": "Configure the dedicated NIC: Add-VMMigrationNetwork -Subnet '10.0.100.0/24' -Priority 1 — then verify with Get-VMMigrationNetwork"
+    }
+  ],
+  "L200": [
+    {
+      "id": "L200-Q1",
+      "scenario": "A customer reports Live Migration failures with the error: 'The Virtual Machine Management Service failed to authenticate the connection for a Virtual Machine migration at the source host.' They recently switched from managing VMs via RDP on the source host to using Windows Admin Center on a dedicated management server.",
+      "question": "What should you investigate first?",
+      "choices": [
+        "A) Check if the Hyper-V role was accidentally removed from the source host",
+        "B) Verify the management server's firewall allows outbound port 6600",
+        "C) Check the authentication type — if CredSSP is configured, this is the double-hop problem; Kerberos delegation may be needed",
+        "D) Reinstall Windows Admin Center on the management server"
+      ],
+      "correct": "C",
+      "explanation": "The timing correlates with the change in management approach. When the customer was using RDP on the source host, CredSSP worked because there was only one hop. Moving to a remote management server introduces a second hop (admin PC → management server → source → destination), which CredSSP cannot handle. Kerberos constrained delegation must be configured for remote management.",
+      "followup_tip": "Verify current setting: Get-VMHost | Select VirtualMachineMigrationAuthenticationType — then check delegation: Get-ADComputer 'SourceHost' -Properties msDS-AllowedToDelegateTo"
+    },
+    {
+      "id": "L200-Q2",
+      "scenario": "A customer attempts to Live Migrate a VM, and it starts transferring memory but fails after 10 minutes with a timeout error. The VM has 64 GB of RAM and runs a busy SQL Server database. During the migration attempt, the customer noticed the transfer progress oscillating between 85% and 92%.",
+      "question": "What is the most likely root cause?",
+      "choices": [
+        "A) The virtual switch name does not match on the destination host",
+        "B) The VM's dirty page rate is too high for the network to keep up, preventing convergence",
+        "C) The Hyper-V VMMS service crashed on the destination host",
+        "D) The VM's VHD file is corrupted and cannot be read"
+      ],
+      "correct": "B",
+      "explanation": "The oscillating progress (85%→92%→85%) is a classic sign that the VM is dirtying memory pages faster than the network can transfer them. SQL Server under heavy load generates a high dirty page rate. The migration iterates but cannot converge to a small enough dirty set for the final blackout window. Compression, RDMA, or scheduling migration during low-activity periods can help.",
+      "followup_tip": "Monitor convergence: Get-Counter '\\Hyper-V VM Live Migration\\Pages/sec Dirty','\\Hyper-V VM Live Migration\\Pages/sec Transferred' -SampleInterval 2 — if Dirty > Transferred consistently, enable compression or use SMB Direct."
+    },
+    {
+      "id": "L200-Q3",
+      "scenario": "After a successful Live Migration of several VMs during planned maintenance, the customer reports that one VM lost network connectivity immediately after landing on the destination host. All other migrated VMs are working fine. The problematic VM had two network adapters — one connected to 'ProductionSwitch' and one to 'BackupSwitch'.",
+      "question": "What should you check on the destination host?",
+      "choices": [
+        "A) Verify that the destination host has virtual switches named exactly 'ProductionSwitch' and 'BackupSwitch'",
+        "B) Check if the VM's MAC addresses changed during migration",
+        "C) Restart the VMMS service on the destination host",
+        "D) Delete and recreate the VM's network adapters"
+      ],
+      "correct": "A",
+      "explanation": "Live Migration requires matching virtual switch names on the destination host. If the destination has 'ProductionSwitch' but is missing 'BackupSwitch' (or it's named differently, like 'Backup-Switch'), the migration may succeed but the adapter connected to the missing switch will be disconnected. Since other VMs work fine (they likely use only 'ProductionSwitch'), this VM's second adapter is the issue.",
+      "followup_tip": "Check switches: Get-VMSwitch -ComputerName 'DestHost' | Select Name — and verify VM adapters: Get-VMNetworkAdapter -VMName 'ProblemVM' | Select SwitchName, Status"
+    }
+  ],
+  "L300": [
+    {
+      "id": "L300-Q1",
+      "scenario": "A customer is building a new Hyper-V cluster with 25 Gbps Mellanox ConnectX-5 NICs that support RDMA (RoCE v2). They want to maximize Live Migration performance. Currently, migrations are using TCP-based transfer and achieving only ~8 Gbps throughput despite the 25 Gbps NICs.",
+      "question": "What configuration changes are needed to achieve near-line-rate migration speeds?",
+      "choices": [
+        "A) Increase MaximumVirtualMachineMigrations to 10 to parallelize the transfer across more connections",
+        "B) Switch the migration performance option to SMB to enable SMB Direct (RDMA), and verify RDMA is operational on both ends",
+        "C) Enable memory compression to reduce the amount of data transferred",
+        "D) Configure jumbo frames (9014 MTU) on the migration NICs to reduce per-packet overhead"
+      ],
+      "correct": "B",
+      "explanation": "TCP-based Live Migration cannot utilize RDMA — it processes data through the kernel networking stack, which caps throughput well below line rate. Switching to SMB transport enables SMB Direct, which uses RDMA for zero-copy, kernel-bypass data transfer. This allows memory pages to be transferred directly from source host memory to destination host memory via the NIC hardware, achieving near-25 Gbps with minimal CPU overhead.",
+      "followup_tip": "Set-VMHost -VirtualMachineMigrationPerformanceOption SMB — then verify: Get-NetAdapterRdma | Select Name,Enabled,Operational — and during migration: Get-SmbMultichannelConnection | Select ClientRdmaCapable,ServerRdmaCapable"
+    },
+    {
+      "id": "L300-Q2",
+      "scenario": "A customer has a mixed cluster being upgraded from Windows Server 2019 to Server 2022. They upgraded HV-Node01 to 2022 and updated VM 'CriticalApp' to configuration version 10.0 while it was on that node. Now they need to Live Migrate 'CriticalApp' back to HV-Node02, which is still running Server 2019.",
+      "question": "Can this migration succeed? If not, what should the customer have done differently?",
+      "choices": [
+        "A) Yes — cross-version Live Migration always works between adjacent server versions",
+        "B) No — VM config version 10.0 is not supported on Server 2019 (max 9.0). The customer should not have run Update-VMVersion until ALL nodes were upgraded to 2022",
+        "C) No — but the customer can downgrade the VM config version back to 9.0 using Set-VMVersion",
+        "D) Yes — but only if Processor Compatibility mode is enabled on the VM"
+      ],
+      "correct": "B",
+      "explanation": "Update-VMVersion is irreversible. VM configuration version 10.0 was introduced with Server 2022 and is not supported on Server 2019 hosts (which support up to version 9.0). The customer should have waited to run Update-VMVersion until the entire cluster was upgraded. This is a common and critical mistake during rolling cluster upgrades. The VM is now stuck on 2022 nodes until the remaining nodes are upgraded.",
+      "followup_tip": "Before upgrading VM versions during rolling upgrades, always check: Get-VMHostSupportedVersion -ComputerName 'EachNode' | Select Version,IsDefault — only run Update-VMVersion after ALL nodes support the target version."
+    }
+  ]
+}

@@ -1,0 +1,134 @@
+{
+  "L100": [
+    {
+      "id": "L100-Q1",
+      "scenario": "A customer is setting up a private cloud hosting environment where multiple tenants share Hyper-V hosts. The customer's security team is concerned that a rogue datacenter administrator could copy a tenant's VHDX file and mount it on another machine to read sensitive data.",
+      "question": "What technology should the customer implement to protect tenant VMs from unauthorized access by fabric administrators?",
+      "choices": [
+        "A) Enable Hyper-V Replica to replicate VMs to a secure site",
+        "B) Deploy Shielded VMs with Host Guardian Service so that VM disks are BitLocker-encrypted and keys are only released to attested hosts",
+        "C) Configure NTFS permissions on the VHDX files to restrict administrator access",
+        "D) Use Dynamic Memory on the VMs to prevent memory inspection"
+      ],
+      "correct": "B",
+      "explanation": "Shielded VMs use BitLocker encryption with keys stored in a virtual TPM. The vTPM state is encrypted and can only be decrypted by a guarded host that has passed attestation with HGS. Even if an admin copies the VHDX, they cannot decrypt it without the vTPM keys. NTFS permissions (C) are trivially bypassed by admins, Hyper-V Replica (A) doesn't add encryption, and Dynamic Memory (D) has nothing to do with memory inspection protection.",
+      "followup_tip": "Verify a host is properly attested: Get-HgsClientConfiguration | Select-Object AttestationStatus, AttestationSubStatus"
+    },
+    {
+      "id": "L100-Q2",
+      "scenario": "A customer has deployed HGS and is choosing an attestation mode. Their guarded hosts are Dell PowerEdge servers with TPM 2.0 chips, running Windows Server 2022. A colleague suggests using Active Directory-based attestation because it's simpler to set up.",
+      "question": "What should you advise regarding the attestation mode?",
+      "choices": [
+        "A) Use AD attestation as recommended — it's the simplest and most secure option",
+        "B) Use Host Key attestation because TPM attestation is not supported on Dell hardware",
+        "C) Use TPM attestation for production since the hosts have TPM 2.0; AD attestation is deprecated and removed in Server 2019+",
+        "D) Use a combination of AD and TPM attestation for defense in depth"
+      ],
+      "correct": "C",
+      "explanation": "AD-based attestation was deprecated starting with Windows Server 2019 and is no longer available. Since the customer's hosts have TPM 2.0 chips and are running Server 2022, TPM attestation is the best choice — it provides hardware-rooted trust by validating the TPM endorsement key, measured boot log, and code integrity policy. Host Key attestation is a fallback for environments without TPM 2.0.",
+      "followup_tip": "Check current attestation mode on HGS: Get-HgsServer | Select-Object TrustModelName, AttestationOperationMode"
+    },
+    {
+      "id": "L100-Q3",
+      "scenario": "A customer has shielded VMs in production. An application team needs console access (VMConnect) to troubleshoot a boot issue inside one of the VMs. They report that VMConnect shows a blank screen with the message 'Enhanced session mode is not available for this virtual machine.'",
+      "question": "Why can't the application team connect to the VM console, and what are the options?",
+      "choices": [
+        "A) The Hyper-V host needs to be updated; VMConnect should work with shielded VMs after patching",
+        "B) Shielded VMs block console access by design to prevent fabric admins from viewing the VM screen; the team should RDP into the VM using guest credentials instead",
+        "C) The VM's integration services are outdated; updating them will restore console access",
+        "D) The HGS attestation has expired; re-attesting the host will restore VMConnect"
+      ],
+      "correct": "B",
+      "explanation": "Shielded VMs intentionally block VMConnect (console access), PowerShell Direct, and other host-to-guest management channels. This is a core security feature — if a fabric admin could connect to the console, the shielding would be meaningless. The application team must use in-guest remote access methods like RDP, SSH, or their own remote management tools. If console access is truly needed, the VM should be set to 'Encryption Supported' mode instead of 'Shielded' mode.",
+      "followup_tip": "Check VM shielding type: Get-VM -Name 'VMName' | Get-VMSecurity | Select-Object Shielded, EncryptionEnabled, TpmEnabled"
+    },
+    {
+      "id": "L100-Q4",
+      "scenario": "A customer is planning their HGS deployment and asks about the difference between a shielded VM and an 'Encryption Supported' VM. They want VMs to be encrypted at rest but their operations team needs VMConnect access for emergency troubleshooting.",
+      "question": "Which VM trust level should you recommend?",
+      "choices": [
+        "A) Shielded mode — it supports both encryption and VMConnect access",
+        "B) Encryption Supported mode — it provides BitLocker encryption at rest while still allowing VMConnect console access and PowerShell Direct",
+        "C) Neither — use standard VMs with BitLocker enabled manually inside the guest",
+        "D) Shielded mode with a special 'admin override' flag in the key protector"
+      ],
+      "correct": "B",
+      "explanation": "Encryption Supported mode provides vTPM, BitLocker encryption, and protects VM memory from host-level inspection — but it still allows VMConnect console access and PowerShell Direct. This is ideal when the threat model requires encryption at rest but the operations team needs emergency management access. Shielded mode (A) blocks all console access with no override option. Standard VMs with BitLocker (C) don't protect the vTPM state. There is no 'admin override' flag (D).",
+      "followup_tip": "Set a VM to Encryption Supported: Set-VMSecurityPolicy -VMName 'VMName' -Shielded $false; then verify with Get-VMSecurity"
+    }
+  ],
+  "L200": [
+    {
+      "id": "L200-Q1",
+      "scenario": "After applying the latest Windows cumulative update to all guarded hosts, shielded VMs can no longer start on the patched hosts. Get-HgsClientConfiguration shows AttestationStatus as 'Failed'. The HGS event log on the attestation server shows Event ID 7000 indicating a code integrity policy hash mismatch.",
+      "question": "What is the most likely cause and what should you do to resolve this?",
+      "choices": [
+        "A) The Windows update corrupted the TPM; clear the TPM and re-register each host",
+        "B) The Windows update changed binaries on the host, causing the CI policy hash to differ from what's registered on HGS; recapture the CI policy from a patched host and re-register it on HGS",
+        "C) The HGS attestation service needs to be updated to match the host patch level",
+        "D) Uninstall the Windows update from all hosts to restore attestation"
+      ],
+      "correct": "B",
+      "explanation": "Windows updates frequently change system binaries, which alters the code integrity policy measurements. When HGS compares the host's current CI policy hash against the registered hash, it finds a mismatch and fails attestation. The fix is to recapture the CI policy from a patched host (using New-CIPolicy), convert it to binary (ConvertFrom-CIPolicy), and register the new policy on HGS (Add-HgsAttestationCIPolicy). Rolling back updates (D) is not a sustainable solution. The TPM is not corrupted (A). HGS itself doesn't need the same patches (C).",
+      "followup_tip": "Recapture and register CI policy: New-CIPolicy -FilePath C:\\Temp\\CIPolicy.xml -Level FilePublisher -Fallback Hash; ConvertFrom-CIPolicy -XmlFilePath C:\\Temp\\CIPolicy.xml -BinaryFilePath C:\\Temp\\CIPolicy.p7b; Add-HgsAttestationCIPolicy -Name 'PostPatch-v2' -Path C:\\Temp\\CIPolicy.p7b"
+    },
+    {
+      "id": "L200-Q2",
+      "scenario": "A customer is migrating a shielded VM from their primary datacenter (Fabric A with HGS-A) to a disaster recovery site (Fabric B with HGS-B). After exporting the VM from Fabric A and importing it on a guarded host in Fabric B, the VM fails to start with the error: 'The key protector for this virtual machine could not be unwrapped.'",
+      "question": "What step was missed during the migration process?",
+      "choices": [
+        "A) The VM needs to be decrypted before export using Disable-VMTPM",
+        "B) The Fabric B HGS guardian was not added to the VM's key protector before export; the key protector only authorizes Fabric A's HGS to release keys",
+        "C) The VM's VHDX needs to be re-encrypted with Fabric B's BitLocker key",
+        "D) The guarded host in Fabric B needs to attest against HGS-A, not HGS-B"
+      ],
+      "correct": "B",
+      "explanation": "A shielded VM's key protector contains the list of HGS guardians authorized to release its encryption keys. When migrating between fabrics, you must add the destination HGS guardian to the key protector BEFORE exporting the VM. Without this step, HGS-B cannot decrypt the key protector because it doesn't have the matching private key. You should export HGS-B's guardian metadata, import it on the source host, and use Grant-VMKeyProtectorAccess to authorize it.",
+      "followup_tip": "Before export, add the destination guardian: $g = Import-HgsGuardian -Path 'C:\\FabricB_Guardian.xml' -Name 'FabricB'; Grant-VMKeyProtectorAccess -VMName 'VM01' -Guardian $g"
+    },
+    {
+      "id": "L200-Q3",
+      "scenario": "A customer reports that a newly provisioned guarded host cannot pass attestation. Get-HgsClientConfiguration shows AttestationStatus: 'Failed' with AttestationSubStatus: 'UnauthorizedHost'. The host has a TPM 2.0 chip and Secure Boot enabled. Other hosts in the same cluster are attesting successfully.",
+      "question": "What is the most likely issue and how should you diagnose it?",
+      "choices": [
+        "A) The host's TPM is faulty; replace the motherboard",
+        "B) The host's network connection to HGS is blocked by a firewall",
+        "C) The host's TPM Endorsement Key (EK) certificate has not been registered on HGS; register it with Add-HgsAttestationTpmHost",
+        "D) The HGS cluster has reached its maximum number of registered hosts"
+      ],
+      "correct": "C",
+      "explanation": "The 'UnauthorizedHost' sub-status typically means HGS does not recognize the host's TPM. In TPM attestation mode, every guarded host's TPM Endorsement Key certificate must be explicitly registered on HGS. For a new host, you need to extract the platform identifier (EK certificate) and register it. Other hosts work because they were already registered. There is no maximum host limit for HGS (D). A firewall issue (B) would show a connectivity error, not 'UnauthorizedHost'.",
+      "followup_tip": "Extract and register the host TPM: (Get-PlatformIdentifier).InnerXml | Out-File C:\\Temp\\host_ek.xml -Encoding utf8; then on HGS: Add-HgsAttestationTpmHost -Name 'NewHost' -Path C:\\Temp\\host_ek.xml"
+    }
+  ],
+  "L300": [
+    {
+      "id": "L300-Q1",
+      "scenario": "A customer's HGS cluster suffered a catastrophic failure — all three nodes had simultaneous disk failures due to a shared storage array malfunction. They have no HGS backup. The HGS Active Directory, signing certificates, and encryption certificates are all lost. They have 50 shielded VMs across 10 guarded hosts that are currently running.",
+      "question": "What is the impact and what should the customer do immediately?",
+      "choices": [
+        "A) No impact — shielded VMs store their own keys and don't need HGS after initial setup",
+        "B) Currently running VMs will continue working, but if any VM is rebooted or a host is restarted, those VMs will never start again because the encryption keys cannot be recovered; immediately prevent any host reboots and VM restarts while rebuilding HGS from scratch with new certificates (the old VMs will be permanently lost)",
+        "C) Simply rebuild HGS with new certificates and all VMs will automatically reconnect",
+        "D) Contact Microsoft Support to retrieve the HGS certificates from Azure backup"
+      ],
+      "correct": "B",
+      "explanation": "This is the worst-case HGS scenario. Running VMs have their vTPM state decrypted in memory, so they continue to work. However, if any VM stops or a host reboots, the host will need to re-attest and request keys from HGS — which no longer exists. Since the encryption certificates' private keys are lost, no one can decrypt the key protectors stored in the VM configurations. The VMs' BitLocker-encrypted disks become permanently inaccessible. The immediate priority is to prevent any reboots. Rebuilding HGS with new certs (C) won't help because the new certs can't decrypt old key protectors. HGS certs are not stored in Azure (D).",
+      "followup_tip": "Prevent this: Always backup HGS! Export-HgsServerState -Path C:\\Backup\\HgsState.xml; also export certificates: Get-ChildItem Cert:\\LocalMachine\\My | Where-Object {$_.Subject -like '*Hgs*'} | ForEach-Object { Export-PfxCertificate -Cert $_ -FilePath \"C:\\Backup\\$($_.Thumbprint).pfx\" -Password $secPwd }"
+    },
+    {
+      "id": "L300-Q2",
+      "scenario": "A security architect is reviewing the shielded VM deployment for a financial services customer. They ask: 'If we deploy shielded VMs, are we protected against side-channel attacks like Spectre and Meltdown? Also, can a compromised VM on the same host attack our shielded VM?'",
+      "question": "What is the correct assessment of these security boundaries?",
+      "choices": [
+        "A) Yes to both — shielded VMs provide complete isolation from all host-level and VM-to-VM attacks including side-channel vulnerabilities",
+        "B) Shielded VMs protect against fabric admin access and untrusted hosts, but do NOT protect against hardware-level side-channel attacks (Spectre/Meltdown) or guest-to-guest attacks via shared CPU cache; these require microcode patches, OS mitigations, and potentially physical host separation for highest-sensitivity workloads",
+        "C) Side-channel attacks are blocked by the vTPM, but guest-to-guest attacks are possible through shared networking",
+        "D) Shielded VMs are immune to all known attacks when TPM attestation is used with HVCI enabled"
+      ],
+      "correct": "B",
+      "explanation": "Shielded VMs protect the VM from the fabric (untrusted administrators and compromised hosts) by encrypting disk, memory, and controlling which hosts can run the VM. However, they do NOT add protection against: (1) Side-channel attacks like Spectre/Meltdown, which exploit shared CPU microarchitectural state — these require microcode updates and OS-level mitigations. (2) Guest-to-guest attacks — Hyper-V's hypervisor isolation is the boundary here, same as non-shielded VMs. For highest sensitivity, the customer should apply all CPU microcode patches, enable HVCI, and consider dedicating physical hosts to the most sensitive VMs.",
+      "followup_tip": "Check if host has side-channel mitigations: Get-SpeculationControlSettings (from SpeculationControl module); also verify HVCI: Get-CimInstance -ClassName Win32_DeviceGuard -Namespace root\\Microsoft\\Windows\\DeviceGuard | Select-Object *Status*"
+    }
+  ]
+}
