@@ -1,0 +1,4 @@
+[
+  {"id": "firewall", "title": "🛡️ Windows Defender Firewall", "description": "From basics to WFP deep dive. Learn firewall profiles, rules, GPO, and advanced diagnostics.", "levels": 3},
+  {"id": "cluster", "title": "🔗 Windows Failover Clustering", "description": "Quorum, CSV, node eviction, stretch clusters. Master cluster troubleshooting.", "levels": 3}
+]

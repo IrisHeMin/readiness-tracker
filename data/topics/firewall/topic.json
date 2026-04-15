@@ -1,0 +1,11 @@
+{
+  "id": "firewall",
+  "title": "Windows Defender Firewall",
+  "icon": "🛡️",
+  "version": "1.0",
+  "levels": [
+    {"id": "L100", "title": "Fundamentals", "file": "L100.md", "estimatedMinutes": 8},
+    {"id": "L200", "title": "Troubleshooting", "file": "L200.md", "estimatedMinutes": 10},
+    {"id": "L300", "title": "Deep Dive", "file": "L300.md", "estimatedMinutes": 10}
+  ]
+}

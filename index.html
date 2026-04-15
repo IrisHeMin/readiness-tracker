@@ -1,464 +1,103 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Readiness Plan Tracker - Team Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        .glass { background: rgba(255,255,255,0.85); backdrop-filter: blur(12px); }
-        .heatmap-cell { transition: all 0.3s ease; cursor: pointer; }
-        .heatmap-cell:hover { transform: scale(1.06); box-shadow: 0 4px 15px rgba(0,0,0,0.15); z-index: 10; position: relative; }
-        .progress-bar-inner { transition: width 1s ease-in-out; }
-        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
-        .card-hover { transition: all 0.3s ease; }
-        .fade-in { animation: fadeIn 0.5s ease-in; }
-        @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
-        .tag { font-size:0.65rem; padding:2px 8px; border-radius:9999px; font-weight:600; }
-        .sync-dot { display:inline-block; width:8px; height:8px; border-radius:50%; }
-        .sync-dot.live { background:#10b981; box-shadow: 0 0 6px #10b981; }
-        .sync-dot.stale { background:#f59e0b; }
-        .sync-dot.none { background:#d1d5db; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎯 Readiness Learning Hub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%); min-height: 100vh; }
+    .card-hover { transition: all 0.3s ease; }
+    .card-hover:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
+    .badge { animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+  </style>
 </head>
-<body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
-
-<!-- Header -->
-<header class="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-50">
-    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
-                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                </svg>
-            </div>
-            <div>
-                <h1 class="text-xl font-bold text-gray-800">Readiness Plan Tracker</h1>
-                <p class="text-xs text-gray-500" id="team-name-label">Cloud Networking Support Team</p>
-            </div>
-        </div>
-        <div class="flex items-center gap-3">
-            <span class="text-xs text-gray-400" id="data-source-label"></span>
-            <button onclick="openTeamSettings()" class="px-4 py-2 text-sm bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition">⚙️ Team Settings</button>
-            <a href="my-plan.html" class="px-4 py-2 text-sm bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl hover:shadow-lg transition">🚀 My Plan</a>
-        </div>
-    </div>
-</header>
-
-<main class="max-w-7xl mx-auto px-6 py-8">
-    <!-- Stats Cards -->
-    <div class="grid grid-cols-4 gap-6 mb-8" id="stats-cards"></div>
-
-    <!-- Progress Bars + Trend -->
-    <div class="grid grid-cols-5 gap-6 mb-8">
-        <div class="col-span-3 glass rounded-2xl shadow-lg p-6 card-hover">
-            <h2 class="text-lg font-semibold text-gray-800 mb-4">📈 Individual Progress</h2>
-            <div id="progress-bars"></div>
-        </div>
-        <div class="col-span-2 glass rounded-2xl shadow-lg p-6 card-hover">
-            <h2 class="text-lg font-semibold text-gray-800 mb-4">📊 Team Comparison</h2>
-            <canvas id="comparisonChart" height="280"></canvas>
-        </div>
+<body class="text-gray-100">
+  <div class="max-w-5xl mx-auto px-4 py-12">
+    <!-- Header -->
+    <div class="text-center mb-12">
+      <h1 class="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-blue-400 via-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+        🎯 Readiness Learning Hub
+      </h1>
+      <p class="text-lg text-slate-400 max-w-2xl mx-auto">
+        Master Windows technologies through structured learning, scenario-based quizzes, and hands-on case simulations
+      </p>
     </div>
 
-    <!-- Plan Heatmap -->
-    <div class="glass rounded-2xl shadow-lg p-6 mb-8 card-hover">
-        <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold text-gray-800">🗺️ Plan Readiness Heatmap</h2>
-            <div class="flex items-center gap-2 text-xs text-gray-500">
-                <span class="inline-block w-3 h-3 rounded bg-red-100"></span>0-25%
-                <span class="inline-block w-3 h-3 rounded bg-yellow-200"></span>25-50%
-                <span class="inline-block w-3 h-3 rounded bg-blue-300"></span>50-75%
-                <span class="inline-block w-3 h-3 rounded bg-green-400"></span>75-100%
-            </div>
-        </div>
-        <div id="heatmap-container" class="overflow-x-auto"></div>
+    <!-- Topic Cards -->
+    <div id="topics-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- Populated by JS -->
     </div>
 
-    <!-- Per-Person Plan Detail Cards -->
-    <h2 class="text-lg font-semibold text-gray-800 mb-4">👥 Member Plan Details</h2>
-    <div class="grid grid-cols-2 gap-6 mb-8" id="member-cards"></div>
-</main>
-
-<footer class="text-center py-6 text-xs text-gray-400">
-    Readiness Plan Tracker v2.1 · Data syncs via localStorage (same browser) · <a href="my-plan.html" class="text-blue-400 hover:underline">Open My Plan →</a>
-</footer>
-
-<!-- Team Settings Modal -->
-<div id="modal-team" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden z-[100] flex items-center justify-center overflow-y-auto py-8">
-    <div class="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl p-8 max-w-lg w-full mx-4 max-h-[85vh] overflow-y-auto" style="animation:fadeIn 0.3s ease">
-        <div class="flex items-center justify-between mb-6">
-            <h2 class="text-xl font-bold text-gray-800">⚙️ Team Settings</h2>
-            <button onclick="closeTeamSettings()" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
-        </div>
-        <!-- Team Name -->
-        <div class="mb-5">
-            <label class="text-sm font-medium text-gray-600 block mb-1">团队名称</label>
-            <input id="ts-team-name" type="text" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none" placeholder="例: Cloud Networking Support Team">
-        </div>
-        <!-- Members List -->
-        <div class="mb-4">
-            <label class="text-sm font-medium text-gray-600 block mb-2">团队成员</label>
-            <div id="ts-members-list" class="space-y-2"></div>
-        </div>
-        <!-- Add Member -->
-        <div class="bg-gray-50 rounded-xl p-4 mb-6">
-            <p class="text-sm font-medium text-gray-600 mb-2">➕ 添加成员</p>
-            <div class="grid grid-cols-5 gap-2">
-                <input id="ts-new-name" type="text" placeholder="姓名" class="col-span-2 px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-200 outline-none">
-                <input id="ts-new-role" type="text" placeholder="角色 (可选)" class="col-span-2 px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-200 outline-none">
-                <button onclick="tsAddMember()" class="px-3 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition">Add</button>
-            </div>
-        </div>
-        <!-- Actions -->
-        <div class="flex gap-3">
-            <button onclick="tsSave()" class="flex-1 py-2.5 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition">💾 Save</button>
-            <button onclick="tsReset()" class="px-4 py-2.5 bg-red-50 text-red-500 rounded-xl text-sm hover:bg-red-100 transition">Reset to Demo</button>
-            <button onclick="closeTeamSettings()" class="px-6 py-2.5 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition">Cancel</button>
-        </div>
+    <div id="loading" class="text-center py-20 text-slate-500">
+      <div class="inline-block animate-spin rounded-full h-8 w-8 border-2 border-blue-400 border-t-transparent mb-4"></div>
+      <p>Loading topics...</p>
     </div>
-</div>
+  </div>
 
-<script>
-// ========== SHARED TEAM CONFIG ==========
-const TEAM_CONFIG_KEY = 'readiness-team-config';
+  <script>
+    (function() {
+      var grid = document.getElementById('topics-grid');
+      var loading = document.getElementById('loading');
 
-const defaultTeamMembers = [
-    { id:"alice", name:"Alice Wang",  role:"Support Engineer II" },
-    { id:"bob",   name:"Bob Zhang",   role:"Support Engineer" },
-    { id:"carol", name:"Carol Li",    role:"Support Engineer II" },
-    { id:"dave",  name:"Dave Liu",    role:"Support Engineer" },
-    { id:"emma",  name:"Emma Xu",     role:"Senior Support Engineer" },
-    { id:"frank", name:"Frank Zhao",  role:"Support Engineer" }
-];
+      fetch('data/topics/index.json')
+        .then(function(r) { return r.json(); })
+        .then(function(topics) {
+          // Load per-topic manifests for estimated time
+          var promises = topics.map(function(t) {
+            return fetch('data/topics/' + t.id + '/topic.json')
+              .then(function(r) { return r.json(); })
+              .then(function(manifest) { t._manifest = manifest; return t; })
+              .catch(function() { return t; });
+          });
+          return Promise.all(promises);
+        })
+        .then(function(topics) {
+          loading.style.display = 'none';
+          topics.forEach(function(topic) {
+            var totalMin = 0;
+            if (topic._manifest && topic._manifest.levels) {
+              topic._manifest.levels.forEach(function(l) { totalMin += l.estimatedMinutes || 0; });
+            }
 
-function loadTeamConfig() {
-    try {
-        const raw = localStorage.getItem(TEAM_CONFIG_KEY);
-        if (raw) return JSON.parse(raw);
-    } catch(e) {}
-    return { teamName: "Cloud Networking Support Team", members: defaultTeamMembers };
-}
-
-function saveTeamConfig(config) {
-    localStorage.setItem(TEAM_CONFIG_KEY, JSON.stringify(config));
-}
-
-let teamConfig = loadTeamConfig();
-let teamMembers = teamConfig.members;
-
-// ========== DEMO FALLBACK DATA (shown when no localStorage data) ==========
-const demoData = {
-    alice:  { plans:[{title:"Azure Networking Readiness",target_date:"2026-04-15",phases:[{title:"Foundation",icon:"📚",total:3,done:3,pct:100},{title:"Intermediate",icon:"🔧",total:4,done:3.5,pct:88},{title:"Advanced",icon:"🏆",total:4,done:1,pct:25}],total:11,done:7.5,pct:68}], overallPct:68 },
-    bob:    { plans:[{title:"Azure Networking Readiness",target_date:"2026-05-01",phases:[{title:"Foundation",icon:"📚",total:3,done:2.5,pct:83},{title:"Intermediate",icon:"🔧",total:4,done:0,pct:0},{title:"Advanced",icon:"🏆",total:4,done:0,pct:0}],total:11,done:2.5,pct:23}], overallPct:23 },
-    carol:  { plans:[{title:"Azure Networking Readiness",target_date:"2026-03-31",phases:[{title:"Foundation",icon:"📚",total:3,done:3,pct:100},{title:"Intermediate",icon:"🔧",total:4,done:4,pct:100},{title:"Advanced",icon:"🏆",total:4,done:3.5,pct:88}],total:11,done:10.5,pct:95}], overallPct:95 },
-    dave:   { plans:[{title:"Azure Networking Readiness",target_date:"2026-05-15",phases:[{title:"Foundation",icon:"📚",total:3,done:1.5,pct:50},{title:"Intermediate",icon:"🔧",total:4,done:0,pct:0},{title:"Advanced",icon:"🏆",total:4,done:0,pct:0}],total:11,done:1.5,pct:14}], overallPct:14 },
-    emma:   { plans:[{title:"Azure Networking Readiness",target_date:"2026-02-01",phases:[{title:"Foundation",icon:"📚",total:3,done:3,pct:100},{title:"Intermediate",icon:"🔧",total:4,done:4,pct:100},{title:"Advanced",icon:"🏆",total:4,done:4,pct:100}],total:11,done:11,pct:100}], overallPct:100 },
-    frank:  { plans:[{title:"Azure Networking Readiness",target_date:"2026-06-01",phases:[{title:"Foundation",icon:"📚",total:3,done:0.5,pct:17},{title:"Intermediate",icon:"🔧",total:4,done:0,pct:0},{title:"Advanced",icon:"🏆",total:4,done:0,pct:0}],total:11,done:0.5,pct:5}], overallPct:5 }
-};
-
-// ========== LOAD DATA: localStorage first, fallback to demo ==========
-function loadAllMemberData() {
-    const result = {};
-    let liveCount = 0;
-    teamMembers.forEach(m => {
-        try {
-            const raw = localStorage.getItem(`readiness-shared-${m.id}`);
-            if (raw) {
-                const parsed = JSON.parse(raw);
-                if (parsed.plans && parsed.plans.length > 0) {
-                    result[m.id] = { ...parsed, source: 'live' };
-                    liveCount++;
-                    return;
+            // Check localStorage for progress
+            var progressKey = 'readiness:' + topic.id;
+            var saved = localStorage.getItem(progressKey);
+            var inProgress = localStorage.getItem(progressKey + ':progress');
+            var badge = '';
+            if (saved) {
+              try {
+                var data = JSON.parse(saved);
+                if (data.completed) {
+                  badge = '<span class="badge inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">✅ Completed</span>';
                 }
+              } catch(e) {}
+            } else if (inProgress) {
+              badge = '<span class="badge inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30">🔄 In Progress</span>';
             }
-        } catch(e) {}
-        // Fallback to demo
-        result[m.id] = { ...demoData[m.id], source: 'demo' };
-    });
-    document.getElementById('data-source-label').innerHTML =
-        liveCount > 0
-        ? `<span class="sync-dot live"></span> ${liveCount}/${teamMembers.length} synced live`
-        : `<span class="sync-dot none"></span> Showing demo data`;
-    return result;
-}
 
-// ========== HELPERS ==========
-function getHeatColor(pct) {
-    if (pct >= 90) return "bg-emerald-500 text-white";
-    if (pct >= 75) return "bg-emerald-400 text-white";
-    if (pct >= 50) return "bg-blue-400 text-white";
-    if (pct >= 25) return "bg-yellow-300 text-gray-800";
-    if (pct > 0)  return "bg-orange-200 text-gray-800";
-    return "bg-red-100 text-gray-500";
-}
-
-function statusLabel(pct) {
-    if (pct >= 100) return { text:"✅ Completed", color:"text-emerald-600" };
-    if (pct >= 50) return { text:"🔄 On Track", color:"text-blue-600" };
-    if (pct >= 20) return { text:"🔄 In Progress", color:"text-blue-500" };
-    return { text:"⚠️ Needs Attention", color:"text-orange-500" };
-}
-
-function timeAgo(iso) {
-    if (!iso) return '';
-    const diff = Date.now() - new Date(iso).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'just now';
-    if (mins < 60) return `${mins}m ago`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h ago`;
-    return `${Math.floor(hrs/24)}d ago`;
-}
-
-// ========== RENDER ==========
-let compChart = null;
-
-function renderDashboard() {
-    document.getElementById('team-name-label').textContent = teamConfig.teamName || 'My Team';
-    const data = loadAllMemberData();
-    const members = teamMembers.map(m => ({ ...m, d: data[m.id] }));
-
-    // Stats
-    const avgPct = Math.round(members.reduce((s,m) => s + (m.d.overallPct||0), 0) / members.length);
-    const completedCount = members.filter(m => m.d.overallPct >= 100).length;
-    const atRisk = members.filter(m => m.d.overallPct < 20 && m.d.overallPct < 100).length;
-    const totalPlans = members.reduce((s,m) => s + (m.d.plans?.length||0), 0);
-
-    document.getElementById('stats-cards').innerHTML = `
-        <div class="glass rounded-2xl shadow-lg p-6 card-hover">
-            <p class="text-sm text-gray-500 mb-1">👥 Team Members</p>
-            <p class="text-3xl font-bold text-gray-800">${members.length}</p>
-            <p class="text-xs text-gray-400 mt-1">${totalPlans} active plans</p>
-        </div>
-        <div class="glass rounded-2xl shadow-lg p-6 card-hover">
-            <p class="text-sm text-gray-500 mb-1">📊 Average Progress</p>
-            <p class="text-3xl font-bold text-blue-600">${avgPct}%</p>
-        </div>
-        <div class="glass rounded-2xl shadow-lg p-6 card-hover">
-            <p class="text-sm text-gray-500 mb-1">✅ Completed Plans</p>
-            <p class="text-3xl font-bold text-emerald-600">${completedCount}</p>
-        </div>
-        <div class="glass rounded-2xl shadow-lg p-6 card-hover">
-            <p class="text-sm text-gray-500 mb-1">⚠️ Needs Attention</p>
-            <p class="text-3xl font-bold text-orange-500">${atRisk}</p>
-        </div>`;
-
-    // Progress Bars (sorted by overall %)
-    const sorted = [...members].sort((a,b) => (b.d.overallPct||0) - (a.d.overallPct||0));
-    document.getElementById('progress-bars').innerHTML = sorted.map(m => {
-        const pct = m.d.overallPct || 0;
-        const st = statusLabel(pct);
-        const barColor = pct >= 100 ? 'bg-emerald-500' : pct < 20 ? 'bg-orange-400' : 'bg-blue-500';
-        const planNames = (m.d.plans||[]).map(p => p.title).join(', ');
-        const syncIcon = m.d.source === 'live'
-            ? `<span class="sync-dot live" title="Live data, updated ${timeAgo(m.d.lastUpdated)}"></span>`
-            : `<span class="sync-dot none" title="Demo data"></span>`;
-        return `<div class="mb-4 cursor-pointer" onclick="window.location.href='my-plan.html?id=${m.id}'">
-            <div class="flex items-center justify-between mb-1">
-                <div class="flex items-center gap-2">
-                    ${syncIcon}
-                    <span class="text-sm font-semibold text-gray-700">${m.name}</span>
-                    <span class="text-xs text-gray-400">${m.role}</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span class="text-xs ${st.color}">${st.text}</span>
-                    <span class="text-sm font-bold text-gray-700">${pct}%</span>
-                </div>
-            </div>
-            <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                <div class="progress-bar-inner ${barColor} h-3 rounded-full" style="width:${pct}%"></div>
-            </div>
-            <p class="text-xs text-gray-400 mt-0.5 ml-1">${planNames || 'No plan yet'}</p>
-        </div>`;
-    }).join('');
-
-    // Comparison Chart (horizontal bar per person)
-    if (compChart) compChart.destroy();
-    const ctx = document.getElementById('comparisonChart').getContext('2d');
-    const barColors = sorted.map(m => {
-        const p = m.d.overallPct||0;
-        return p >= 100 ? '#10b981' : p >= 50 ? '#3b82f6' : p >= 20 ? '#60a5fa' : '#f59e0b';
-    });
-    compChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: sorted.map(m => m.name.split(' ')[0]),
-            datasets: [{ data: sorted.map(m => m.d.overallPct||0), backgroundColor: barColors, borderRadius: 6, barThickness: 24 }]
-        },
-        options: {
-            responsive: true, indexAxis: 'y',
-            scales: { x: { beginAtZero:true, max:100, ticks:{ callback:v=>v+'%' }, grid:{color:'#f1f5f9'} }, y: { grid:{display:false} } },
-            plugins: { legend:{display:false}, tooltip:{ callbacks:{ label:ctx=>ctx.parsed.x+'%' } } }
-        }
-    });
-
-    // Heatmap: rows = members, columns = their plans' phases
-    renderHeatmap(members);
-
-    // Member detail cards
-    renderMemberCards(members);
-}
-
-function renderHeatmap(members) {
-    // Collect all unique plan names across all members
-    const allPlanNames = new Set();
-    members.forEach(m => (m.d.plans||[]).forEach(p => allPlanNames.add(p.title)));
-    const planList = [...allPlanNames];
-
-    if (planList.length === 0) {
-        document.getElementById('heatmap-container').innerHTML = '<p class="text-sm text-gray-400 text-center py-8">还没有成员创建计划</p>';
-        return;
-    }
-
-    let html = '<table class="w-full"><thead><tr><th class="text-left text-sm text-gray-500 pb-3 pr-4 min-w-[120px]">Member</th>';
-    planList.forEach(name => {
-        html += `<th class="text-center text-xs text-gray-500 pb-3 px-2 min-w-[100px]">${name}</th>`;
-    });
-    html += '<th class="text-center text-xs text-gray-500 pb-3 px-2 font-bold min-w-[80px]">Overall</th></tr></thead><tbody>';
-
-    members.forEach(m => {
-        const overall = m.d.overallPct || 0;
-        html += `<tr class="cursor-pointer hover:bg-blue-50/50 transition" onclick="window.location.href='my-plan.html?id=${m.id}'">`;
-        html += `<td class="text-sm font-medium text-gray-700 py-2 pr-4">
-            <div class="flex items-center gap-2">
-                <div class="w-7 h-7 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-lg flex items-center justify-center text-white text-xs font-bold">${m.name.charAt(0)}</div>
-                ${m.name}
-            </div></td>`;
-
-        planList.forEach(planName => {
-            const memberPlan = (m.d.plans||[]).find(p => p.title === planName);
-            if (memberPlan) {
-                html += `<td class="px-2 py-2"><div class="heatmap-cell ${getHeatColor(memberPlan.pct)} rounded-lg text-center py-3 text-sm font-semibold">${memberPlan.pct}%</div></td>`;
-            } else {
-                html += `<td class="px-2 py-2"><div class="rounded-lg text-center py-3 text-sm text-gray-300 bg-gray-50">—</div></td>`;
-            }
+            var card = document.createElement('a');
+            card.href = 'learn.html?topic=' + topic.id;
+            card.className = 'card-hover block bg-slate-800/60 backdrop-blur border border-slate-700/50 rounded-2xl p-6 cursor-pointer';
+            card.innerHTML =
+              '<div class="flex items-start justify-between mb-3">' +
+                '<span class="text-4xl">' + (topic.title.match(/^\S+/) || [''])[0] + '</span>' +
+                (badge ? '<div>' + badge + '</div>' : '') +
+              '</div>' +
+              '<h2 class="text-xl font-semibold text-white mb-2">' + topic.title.replace(/^\S+\s*/, '') + '</h2>' +
+              '<p class="text-slate-400 text-sm mb-4 leading-relaxed">' + topic.description + '</p>' +
+              '<div class="flex items-center gap-4 text-xs text-slate-500">' +
+                '<span class="flex items-center gap-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>' + topic.levels + ' levels</span>' +
+                '<span class="flex items-center gap-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>~' + totalMin + ' min</span>' +
+              '</div>';
+            grid.appendChild(card);
+          });
+        })
+        .catch(function(err) {
+          loading.innerHTML = '<p class="text-red-400">Failed to load topics. ' + err.message + '</p>';
         });
-
-        html += `<td class="px-2 py-2"><div class="heatmap-cell ${getHeatColor(overall)} rounded-lg text-center py-3 text-sm font-bold">${overall}%</div></td>`;
-        html += '</tr>';
-    });
-    html += '</tbody></table>';
-    document.getElementById('heatmap-container').innerHTML = html;
-}
-
-function renderMemberCards(members) {
-    document.getElementById('member-cards').innerHTML = members.map(m => {
-        const pct = m.d.overallPct || 0;
-        const plans = m.d.plans || [];
-        const syncInfo = m.d.source === 'live'
-            ? `<span class="sync-dot live"></span> <span class="text-xs text-emerald-600">Updated ${timeAgo(m.d.lastUpdated)}</span>`
-            : `<span class="sync-dot none"></span> <span class="text-xs text-gray-400">Demo data</span>`;
-
-        let phaseDetails = '';
-        plans.forEach(plan => {
-            phaseDetails += `<div class="mb-3">
-                <p class="text-xs font-semibold text-gray-600 mb-1.5">${plan.title} <span class="text-gray-400">→ ${plan.target_date||''}</span></p>
-                ${(plan.phases||[]).map(ph => `
-                    <div class="flex items-center gap-2 mb-1">
-                        <span class="text-xs w-4">${ph.icon||'📌'}</span>
-                        <span class="text-xs text-gray-600 w-28 truncate">${ph.title}</span>
-                        <div class="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                            <div class="h-1.5 rounded-full transition-all ${ph.pct>=100?'bg-emerald-500':ph.pct>=50?'bg-blue-500':'bg-blue-300'}" style="width:${ph.pct}%"></div>
-                        </div>
-                        <span class="text-xs font-medium w-8 text-right ${ph.pct>=100?'text-emerald-600':'text-gray-500'}">${ph.pct}%</span>
-                    </div>`).join('')}
-            </div>`;
-        });
-
-        if (plans.length === 0) {
-            phaseDetails = '<p class="text-sm text-gray-400 py-4 text-center">尚未创建 Readiness Plan</p>';
-        }
-
-        return `<div class="glass rounded-2xl shadow-lg p-5 card-hover fade-in cursor-pointer" onclick="window.location.href='my-plan.html?id=${m.id}'">
-            <div class="flex items-center justify-between mb-3">
-                <div class="flex items-center gap-2">
-                    <div class="w-9 h-9 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-xl flex items-center justify-center text-white font-bold">${m.name.charAt(0)}</div>
-                    <div>
-                        <p class="text-sm font-bold text-gray-800">${m.name}</p>
-                        <p class="text-xs text-gray-400">${m.role}</p>
-                    </div>
-                </div>
-                <div class="text-right">
-                    <p class="text-2xl font-bold ${pct>=100?'text-emerald-600':pct>=50?'text-blue-600':'text-orange-500'}">${pct}%</p>
-                    <div class="flex items-center gap-1 justify-end mt-0.5">${syncInfo}</div>
-                </div>
-            </div>
-            <div class="w-full bg-gray-200 rounded-full h-2 mb-3 overflow-hidden">
-                <div class="h-2 rounded-full transition-all ${pct>=100?'bg-emerald-500':pct<20?'bg-orange-400':'bg-blue-500'}" style="width:${pct}%"></div>
-            </div>
-            ${phaseDetails}
-        </div>`;
-    }).join('');
-}
-
-// ========== TEAM SETTINGS ==========
-let tsMembers = [];
-
-function openTeamSettings() {
-    teamConfig = loadTeamConfig();
-    tsMembers = JSON.parse(JSON.stringify(teamConfig.members));
-    document.getElementById('ts-team-name').value = teamConfig.teamName || '';
-    renderTsMembers();
-    document.getElementById('modal-team').classList.remove('hidden');
-}
-
-function closeTeamSettings() { document.getElementById('modal-team').classList.add('hidden'); }
-
-function renderTsMembers() {
-    document.getElementById('ts-members-list').innerHTML = tsMembers.length === 0
-        ? '<p class="text-sm text-gray-400 py-3 text-center">还没有成员，请在下方添加</p>'
-        : tsMembers.map((m, i) => `
-        <div class="flex items-center gap-2 group bg-white rounded-lg px-3 py-2 border border-gray-100">
-            <div class="w-7 h-7 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0">${m.name.charAt(0)}</div>
-            <input type="text" value="${esc(m.name)}" onchange="tsMembers[${i}].name=this.value" class="flex-1 text-sm border-none bg-transparent font-medium px-1 focus:ring-0 outline-none" placeholder="Name">
-            <input type="text" value="${esc(m.role||'')}" onchange="tsMembers[${i}].role=this.value" class="flex-1 text-sm border-none bg-transparent text-gray-500 px-1 focus:ring-0 outline-none" placeholder="Role">
-            <button onclick="tsMembers.splice(${i},1); renderTsMembers()" class="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition px-1 text-lg" title="Remove">✕</button>
-        </div>`).join('');
-}
-
-function tsAddMember() {
-    const nameInput = document.getElementById('ts-new-name');
-    const roleInput = document.getElementById('ts-new-role');
-    const name = nameInput.value.trim();
-    if (!name) { nameInput.focus(); return; }
-    const id = name.toLowerCase().replace(/[^a-z0-9]/g, '') + '_' + Date.now().toString(36).slice(-4);
-    tsMembers.push({ id, name, role: roleInput.value.trim() || 'Support Engineer' });
-    nameInput.value = ''; roleInput.value = '';
-    renderTsMembers();
-    nameInput.focus();
-}
-
-function tsSave() {
-    const validMembers = tsMembers.filter(m => m.name.trim());
-    validMembers.forEach(m => { m.name = m.name.trim(); m.role = (m.role||'').trim(); });
-    const config = { teamName: document.getElementById('ts-team-name').value.trim() || 'My Team', members: validMembers };
-    saveTeamConfig(config);
-    teamConfig = config;
-    teamMembers = config.members;
-    closeTeamSettings();
-    renderDashboard();
-}
-
-function tsReset() {
-    if (!confirm('确定要恢复为 Demo 数据吗？这会覆盖当前团队设置。')) return;
-    localStorage.removeItem(TEAM_CONFIG_KEY);
-    teamConfig = loadTeamConfig();
-    teamMembers = teamConfig.members;
-    closeTeamSettings();
-    renderDashboard();
-}
-
-function esc(s) { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
-
-// ========== INIT ==========
-document.getElementById('team-name-label').textContent = teamConfig.teamName || 'My Team';
-renderDashboard();
-// Auto-refresh every 30s to pick up localStorage changes
-setInterval(() => { teamConfig = loadTeamConfig(); teamMembers = teamConfig.members; renderDashboard(); }, 30000);
-</script>
+    })();
+  </script>
 </body>
 </html>

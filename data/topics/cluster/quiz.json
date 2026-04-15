@@ -1,0 +1,134 @@
+{
+  "L100": [
+    {
+      "id": "L100-Q1",
+      "scenario": "A customer has a 2-node cluster with a file share witness. During a planned maintenance, they shut down Node2. While Node2 is down, the file server hosting the file share witness also goes down for unplanned maintenance.",
+      "question": "What happens to the cluster?",
+      "choices": [
+        "A) The cluster continues to run normally because Node1 is still up",
+        "B) The cluster loses quorum and goes offline — only 1 out of 3 votes remain",
+        "C) The cluster automatically creates a new witness",
+        "D) Node1 takes over the witness role"
+      ],
+      "correct": "B",
+      "explanation": "In a 2-node + witness setup, there are 3 total votes. With Node2 down (1 vote lost) and the file share witness down (1 vote lost), only Node1's vote remains — that's 1 out of 3, which is NOT a majority. The cluster loses quorum and all clustered roles go offline. This is why it's critical to ensure the witness is always available, especially during planned maintenance. Best practice: use Cloud Witness for resilience.",
+      "followup_tip": "Recovery: Start-ClusterNode -Name Node1 -FixQuorum (force quorum on Node1), then fix the witness ASAP."
+    },
+    {
+      "id": "L100-Q2",
+      "scenario": "A customer reports that their 3-node cluster shows all nodes as 'Up', but clients cannot connect to the clustered file server role. The cluster virtual name doesn't resolve in DNS.",
+      "question": "What is the most likely cause?",
+      "choices": [
+        "A) The cluster service is corrupted",
+        "B) The Cluster Name Object (CNO) may be disabled in Active Directory or DNS registration failed",
+        "C) All three nodes need to be rebooted",
+        "D) The file server role needs to be reinstalled"
+      ],
+      "correct": "B",
+      "explanation": "If all nodes are Up but the cluster virtual name doesn't resolve, the issue is usually with the Cluster Name Object (CNO) in Active Directory or DNS registration. The CNO is a computer object in AD that the cluster uses for its virtual name. If an AD admin disables it or if the cluster doesn't have permission to update DNS, clients can't resolve the cluster name. Check AD for the CNO status and verify DNS registration.",
+      "followup_tip": "Quick check: nslookup <ClusterName> — if it fails, check AD for the computer object. Fix: Repair-ClusterResource 'Cluster Name'"
+    },
+    {
+      "id": "L100-Q3",
+      "scenario": "You are asked to check the health of a customer's cluster. You run Get-ClusterNode and see:\n\nName    State    DynamicWeight\nNode1   Up       1\nNode2   Up       1\nNode3   Paused   1",
+      "question": "What does the 'Paused' state mean for Node3?",
+      "choices": [
+        "A) Node3 has crashed and is being recovered",
+        "B) Node3 is online but won't accept new workloads — it was manually paused (e.g., for maintenance)",
+        "C) Node3 is in the process of joining the cluster",
+        "D) Node3 has been evicted from the cluster"
+      ],
+      "correct": "B",
+      "explanation": "The 'Paused' state means the node is still a cluster member and participating in quorum voting, but it has been manually paused (typically for maintenance). It will NOT accept new workloads or failover targets. Existing resources on a paused node continue to run. An admin must 'Resume' the node to make it available for new workloads again.",
+      "followup_tip": "Resume: Resume-ClusterNode -Name Node3. Note: 'Paused' ≠ 'Down' — paused nodes still vote in quorum!"
+    },
+    {
+      "id": "L100-Q4",
+      "scenario": "A customer is setting up a new 2-node cluster and asks you: 'What type of quorum witness should I use? We have shared storage but we also use Azure.'",
+      "question": "What is the recommended witness type?",
+      "choices": [
+        "A) Disk Witness — since they have shared storage, use a small shared disk",
+        "B) Cloud Witness — it's resilient, easy to set up, and works for any cluster topology",
+        "C) No witness — a 2-node cluster doesn't need one",
+        "D) File Share Witness on one of the cluster nodes"
+      ],
+      "correct": "B",
+      "explanation": "Cloud Witness (Azure Blob Storage) is the recommended witness type for modern clusters. It's resilient (replicated in Azure), doesn't require extra infrastructure, works across sites, and is easy to set up. While Disk Witness works, Cloud Witness is preferred because it doesn't consume a shared disk and survives entire site failures. NEVER skip the witness on a 2-node cluster (C is wrong), and NEVER host the witness on a cluster node (D is wrong — defeats the purpose).",
+      "followup_tip": "Set up: Set-ClusterQuorum -CloudWitness -AccountName 'storageacct' -AccessKey 'key'"
+    }
+  ],
+  "L200": [
+    {
+      "id": "L200-Q1",
+      "scenario": "A customer's 3-node cluster experienced a failover last night. Node2 was evicted from the cluster. They restored Node2 and it rejoined. They want to know: why was Node2 evicted? You collect the cluster log from Node1.",
+      "question": "What string should you search for FIRST in the cluster log to understand the eviction?",
+      "choices": [
+        "A) Search for 'quorum lost'",
+        "B) Search for 'regroup' and 'no longer a member' to find when and why membership changed",
+        "C) Search for 'resource failed'",
+        "D) Search for 'disk error'"
+      ],
+      "correct": "B",
+      "explanation": "Node eviction is handled by the Membership Manager through the 'regroup' process. Searching for 'regroup' shows you exactly when the membership change started and why (e.g., 'missed heartbeat', 'communication failure'). Then search for 'no longer a member' to find when Node2 was officially removed. This gives you the timeline and root cause (network issue? node crash? resource exhaustion?).",
+      "followup_tip": "Full search sequence: 'regroup' → 'missed heartbeat' → 'no longer a member' → then correlate with System event log on Node2."
+    },
+    {
+      "id": "L200-Q2",
+      "scenario": "A customer reports that their Hyper-V VMs on a cluster are running extremely slowly. You check and find that CSV is in 'Redirected I/O' mode. The cluster has 3 nodes, and Node1 is the CSV coordinator.",
+      "question": "What does 'Redirected I/O' mean and why would it cause slowness?",
+      "choices": [
+        "A) It means CSV data is being written to a backup location — slowness is normal during backup",
+        "B) It means I/O from non-coordinator nodes is being routed over the network through the coordinator node instead of going directly to storage — network becomes a bottleneck",
+        "C) It means the CSV filesystem is corrupted and needs repair",
+        "D) It means the cluster is in maintenance mode"
+      ],
+      "correct": "B",
+      "explanation": "In normal 'Direct I/O' mode, each node accesses the shared storage directly via its own storage path. In 'Redirected I/O' mode, non-coordinator nodes route their I/O through the coordinator node via SMB over the network. This makes the network a bottleneck for ALL storage I/O, causing severe performance degradation. Common causes: storage connectivity issue on one node, incompatible filter driver, or NTFS metadata operations.",
+      "followup_tip": "Diagnose: Get-ClusterSharedVolumeState | Format-Table Name, Node, StateInfo, FileSystemRedirectedIOReason"
+    },
+    {
+      "id": "L200-Q3",
+      "scenario": "A customer has a 4-node cluster. They report that intermittently, one random node gets evicted from the cluster, then rejoins minutes later. This happens roughly every few days, affecting different nodes each time. The cluster log shows 'missed heartbeat' before each eviction.",
+      "question": "Given that different nodes are affected randomly, what is the most likely root cause?",
+      "choices": [
+        "A) The cluster heartbeat threshold is set too low",
+        "B) A network infrastructure issue (switch, NIC driver, or VMQ/RSS) causing intermittent packet loss",
+        "C) One specific node has a bad NIC",
+        "D) The cluster database is corrupted"
+      ],
+      "correct": "B",
+      "explanation": "When different nodes are affected randomly and the symptom is 'missed heartbeat', the issue is almost always in the network infrastructure — not the nodes themselves. Common culprits: switch port flapping, NIC driver bugs (especially with VMQ or RSS offloading), spanning tree reconvergence, or VLAN misconfiguration. The randomness rules out a single-node hardware issue. Check switch logs, NIC driver versions, and consider disabling VMQ/RSS as a test.",
+      "followup_tip": "Quick test: Disable VMQ on all cluster NICs: Set-NetAdapterVmq -Name 'NIC' -Enabled $false — if evictions stop, VMQ was the culprit."
+    }
+  ],
+  "L300": [
+    {
+      "id": "L300-Q1",
+      "scenario": "A customer has a 2-node cluster at Site A and a 2-node cluster at Site B, forming a stretch cluster with Cloud Witness in Azure. An Azure region outage takes the Cloud Witness offline. At the same time, the network link between Site A and Site B goes down.",
+      "question": "What happens to the cluster?",
+      "choices": [
+        "A) Both sites continue independently with their 2 nodes each",
+        "B) The cluster goes completely offline because no site can achieve majority (2 out of 5 is not >50%)",
+        "C) The site that most recently communicated with the witness wins",
+        "D) Dynamic quorum automatically adjusts so one site survives"
+      ],
+      "correct": "B",
+      "explanation": "With 4 nodes + Cloud Witness = 5 total votes. Majority requires 3. Site A has 2 votes, Site B has 2 votes, and Cloud Witness is offline (0 votes). Neither site can reach 3 votes, so BOTH sites lose quorum. This is the classic multi-site failure scenario. Recovery requires either: (1) restoring the network link between sites, (2) restoring Cloud Witness, or (3) manually forcing quorum at one site with Start-ClusterNode -FixQuorum. Dynamic quorum helps in sequential failures but NOT in a simultaneous partition like this.",
+      "followup_tip": "Prevention: Consider using a witness in a third Azure region, or use a File Share Witness at a third site."
+    },
+    {
+      "id": "L300-Q2",
+      "scenario": "A customer says 'Our cluster was fine, then we ran Start-ClusterNode -FixQuorum on two different nodes at two different sites during an outage. Now both sites think they're the active cluster and both are writing to shared storage!'",
+      "question": "What is this situation called and what is the immediate action?",
+      "choices": [
+        "A) This is a normal failover — let it resolve automatically",
+        "B) This is a split-brain scenario — immediately stop cluster service on one site to prevent data corruption",
+        "C) Reboot all nodes to resolve the conflict",
+        "D) Run Test-Cluster to fix the configuration"
+      ],
+      "correct": "B",
+      "explanation": "This is a SPLIT-BRAIN — the most dangerous cluster scenario. Both partitions believe they own the cluster and are writing to shared storage, which can cause data corruption. Immediate action: STOP the cluster service on one site (preferably the one with less recent data or fewer active workloads). Then investigate which side has the most current data before bringing services back. This is why -FixQuorum should ONLY be used on ONE partition, never both.",
+      "followup_tip": "CRITICAL RULE: Never use -FixQuorum on more than one partition simultaneously. Always coordinate with the customer to choose ONE surviving partition."
+    }
+  ]
+}

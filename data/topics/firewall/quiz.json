@@ -1,0 +1,134 @@
+{
+  "L100": [
+    {
+      "id": "L100-Q1",
+      "scenario": "A customer reports that their application cannot receive incoming connections on port 8080. The firewall is enabled. They haven't created any firewall rules for this port.",
+      "question": "Based on the default firewall behavior, why is the traffic being blocked?",
+      "choices": [
+        "A) The outbound default action is set to Block",
+        "B) The inbound default action is Block, and there's no Allow rule for port 8080",
+        "C) The firewall service (MPSSVC) is not running",
+        "D) Port 8080 is always blocked by Windows Firewall"
+      ],
+      "correct": "B",
+      "explanation": "By default, Windows Firewall BLOCKS all inbound traffic unless there is an explicit Allow rule. Since the customer hasn't created a rule for port 8080, inbound traffic to that port is blocked by the default inbound action. The customer needs to create an inbound Allow rule for TCP port 8080.",
+      "followup_tip": "Quick fix command: New-NetFirewallRule -DisplayName 'Allow Port 8080' -Direction Inbound -Protocol TCP -LocalPort 8080 -Action Allow"
+    },
+    {
+      "id": "L100-Q2",
+      "scenario": "A customer has a server with two NICs: Ethernet (connected to corporate domain) and Wi-Fi (connected to a guest network). They created a firewall rule that allows SQL Server traffic on the 'Domain' profile only. But SQL Server connections from the Wi-Fi network are being blocked.",
+      "question": "Why is the SQL traffic blocked on the Wi-Fi interface?",
+      "choices": [
+        "A) SQL Server doesn't support multiple NICs",
+        "B) The Wi-Fi NIC is likely on the 'Public' profile, and the rule only applies to 'Domain' profile",
+        "C) Windows Firewall cannot have two profiles active simultaneously",
+        "D) The BFE service needs to be restarted"
+      ],
+      "correct": "B",
+      "explanation": "Each NIC maps to its own firewall profile. The Ethernet NIC connected to the domain will be on the 'Domain' profile, while the Wi-Fi connected to a guest network will be on 'Public' profile. Since the SQL rule only applies to the 'Domain' profile, it doesn't affect traffic on the Wi-Fi (Public) interface. To fix: either add 'Public' profile to the rule or create a separate rule.",
+      "followup_tip": "Check profile per NIC: Get-NetConnectionProfile | Format-Table InterfaceAlias, NetworkCategory"
+    },
+    {
+      "id": "L100-Q3",
+      "scenario": "A customer says 'I checked my firewall and it shows no rules are blocking anything, but I still can't connect.' You ask them to run Get-NetFirewallProfile and they show you that all three profiles have Enabled=True.",
+      "question": "What is the FIRST thing you should check to confirm the firewall is actually the cause?",
+      "choices": [
+        "A) Immediately check GPO settings",
+        "B) Temporarily disable the firewall and test connectivity",
+        "C) Run netsh wfp show filters",
+        "D) Reinstall the firewall service"
+      ],
+      "correct": "B",
+      "explanation": "The quickest way to confirm whether the firewall is the cause is to temporarily disable it and test. If the connectivity works with firewall disabled, you've confirmed the firewall is the issue. Then re-enable and investigate further. This is Step 1 of the troubleshooting framework. Don't jump to advanced diagnostics (GPO, WFP) before confirming the basic cause.",
+      "followup_tip": "Always re-enable immediately! Set-NetFirewallProfile -All -Enabled True"
+    },
+    {
+      "id": "L100-Q4",
+      "scenario": "A customer wants to check the firewall log to see what traffic is being blocked. They look at %systemroot%\\system32\\LogFiles\\Firewall\\pfirewall.log but the file is empty or doesn't exist.",
+      "question": "Why is the firewall log empty/missing?",
+      "choices": [
+        "A) The customer doesn't have admin rights",
+        "B) The firewall is not enabled",
+        "C) Firewall logging is OFF by default — it must be enabled manually",
+        "D) The log file path has changed in newer Windows versions"
+      ],
+      "correct": "C",
+      "explanation": "Windows Firewall logging is DISABLED by default. The customer needs to enable it explicitly. This is a very common 'gotcha' — many customers expect logging to be on. Enable with: Set-NetFirewallProfile -All -LogBlocked True -LogAllowed True",
+      "followup_tip": "Pro tip: Also set a reasonable max log size: -LogMaxSizeKilobytes 32768"
+    }
+  ],
+  "L200": [
+    {
+      "id": "L200-Q1",
+      "scenario": "A customer reports that after joining their machine to a new OU, their locally created firewall rule for a custom application stopped working. The rule is still visible in Windows Firewall with Advanced Security, and it shows Enabled=True.",
+      "question": "What is the most likely cause?",
+      "choices": [
+        "A) The OU's GPO has set 'Apply local firewall rules: No' for the active profile",
+        "B) The local rule was automatically deleted by the GPO",
+        "C) The firewall service restarted and lost the rule",
+        "D) The application path changed after the OU join"
+      ],
+      "correct": "A",
+      "explanation": "When a GPO sets 'Apply local firewall rules: No', all locally created rules are IGNORED — but they still appear visible and enabled in the UI! This is a very common trap. The rule looks fine but has no effect. Check: gpresult /h report.html → look for the 'Apply local firewall rules' setting under the active profile.",
+      "followup_tip": "Verify with: reg query 'HKLM\\SOFTWARE\\Policies\\Microsoft\\WindowsFirewall\\DomainProfile' /v AllowLocalFirewallRules"
+    },
+    {
+      "id": "L200-Q2",
+      "scenario": "A customer has confirmed that disabling the firewall fixes their connectivity issue. Now they need to find exactly which rule is blocking the traffic. The firewall log is enabled but shows thousands of entries.",
+      "question": "What is the most EFFICIENT approach to identify the specific blocking rule?",
+      "choices": [
+        "A) Read through all log entries manually",
+        "B) Enable WFP auditing (auditpol), reproduce the issue, check Security Event 5157",
+        "C) Delete all firewall rules and add them back one by one",
+        "D) Export all rules to CSV and check each one"
+      ],
+      "correct": "B",
+      "explanation": "WFP auditing (Event ID 5157) gives you the EXACT filter/rule that blocked the connection, including the application, port, and IP involved. This is far more efficient than reading log files or checking rules manually. After enabling auditing, reproduce the issue once, then check the Security event log for the specific block event.",
+      "followup_tip": "Command: auditpol /set /subcategory:\"Filtering Platform Packet Drop\" /success:enable /failure:enable"
+    },
+    {
+      "id": "L200-Q3",
+      "scenario": "A customer says 'I can ping the server from Machine A but not from Machine B. Both machines are on the same subnet, and the server's firewall has ICMP enabled for all profiles.'",
+      "question": "What should you check on Machine B's OUTBOUND firewall?",
+      "choices": [
+        "A) Nothing — outbound is allowed by default, check something else (e.g., NIC, routing, DNS)",
+        "B) Check if Machine B has an outbound block rule for ICMP",
+        "C) Check if Machine B's firewall service is running",
+        "D) Both A and B are reasonable next steps"
+      ],
+      "correct": "D",
+      "explanation": "While outbound traffic is ALLOWED by default, it's possible that a custom outbound Block rule exists on Machine B. However, it's equally important to check non-firewall causes first (NIC issue, routing, IP conflict). A good support engineer checks the most likely cause first: since outbound is allowed by default, check network basics (can Machine B reach anything? is it a general connectivity issue?), THEN check for unusual outbound block rules.",
+      "followup_tip": "Troubleshooting order: Test-NetConnection -ComputerName <server> → if all ports fail, it's likely not firewall but network connectivity."
+    }
+  ],
+  "L300": [
+    {
+      "id": "L300-Q1",
+      "scenario": "A customer's Windows Firewall rules show 'Allow' for their application, but traffic is still blocked. You've confirmed the rule matches the correct profile, port, and program path. Disabling Windows Firewall STILL doesn't fix the issue.",
+      "question": "If disabling Windows Firewall doesn't fix the blocking, what does this tell you?",
+      "choices": [
+        "A) The firewall rules are corrupted",
+        "B) A third-party WFP callout driver or security software is blocking at a lower layer",
+        "C) The BFE service is malfunctioning",
+        "D) The GPO is overriding the disable command"
+      ],
+      "correct": "B",
+      "explanation": "If disabling Windows Defender Firewall doesn't resolve the block, the issue is NOT the Windows Firewall rules. Third-party security products (antivirus, endpoint protection) can install their own WFP callout drivers that filter traffic at a LOWER layer than Windows Firewall. These continue to block traffic even when WDF is disabled. Use 'netsh wfp show state' and look for non-Microsoft providers/callouts.",
+      "followup_tip": "Key diagnostic: netsh wfp show state → open wfpstate.xml → search for <providerKey> entries that are NOT from Microsoft."
+    },
+    {
+      "id": "L300-Q2",
+      "scenario": "You need to trace exactly which WFP filter is dropping a customer's traffic. You run 'netsh wfp capture start', reproduce the issue, and stop the capture. In the wfpdiag.xml you find a classifyDrop with filterId=67890 at layer FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V4.",
+      "question": "What is your next step to identify what this filter belongs to?",
+      "choices": [
+        "A) Run 'netsh wfp show filters' and search for filterId 67890 in the output XML",
+        "B) Restart the BFE service to clear the filter",
+        "C) Check Event Viewer for this filter ID",
+        "D) Run 'netsh advfirewall show allprofiles'"
+      ],
+      "correct": "A",
+      "explanation": "After finding the filterID that caused the drop, cross-reference it with the full filter list from 'netsh wfp show filters'. The filters.xml will show which provider, sub-layer, and conditions are associated with filter 67890. This tells you whether it's a Windows Firewall rule, a third-party callout, IPsec rule, or something else entirely.",
+      "followup_tip": "In filters.xml, look for: <filterId>67890</filterId> → check its <displayData><name> and <providerKey> to identify the owner."
+    }
+  ]
+}
