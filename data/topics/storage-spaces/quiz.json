@@ -1,0 +1,134 @@
+{
+  "L100": [
+    {
+      "id": "L100-Q1",
+      "scenario": "A customer is deploying a new file server and wants to use Storage Spaces. They have 4 physical disks and need to survive up to 1 disk failure while maximizing usable capacity. Their workload is primarily sequential file reads and writes for archival data.",
+      "question": "Which resiliency type should you recommend?",
+      "choices": [
+        "A) Simple — provides the best throughput with all 4 disks",
+        "B) Two-way Mirror — survives 1 disk failure with 50% efficiency",
+        "C) Single Parity — survives 1 disk failure with ~67-80% efficiency",
+        "D) Three-way Mirror — provides maximum fault tolerance"
+      ],
+      "correct": "C",
+      "explanation": "Single Parity is the best fit here. The customer needs to survive 1 disk failure (ruling out Simple) and wants to maximize usable capacity with a sequential/archival workload. Single Parity provides ~67-80% space efficiency compared to Two-way Mirror's 50%, and its sequential read/write performance is well-suited for archival workloads. Three-way Mirror would be overkill for the stated requirement and wastes capacity (33% efficiency).",
+      "followup_tip": "Use Get-ResiliencySetting -StoragePool (Get-StoragePool -FriendlyName 'Pool1') to see available resiliency options and their default column counts."
+    },
+    {
+      "id": "L100-Q2",
+      "scenario": "A customer has deployed tiered storage with SSD and HDD tiers. They notice that a critical database file they placed on the volume is experiencing slow performance during peak hours. They expected it to always be on the SSD tier.",
+      "question": "How should you ensure the database file always resides on the SSD tier?",
+      "choices": [
+        "A) Increase the SSD tier size so the heat map ranks it higher",
+        "B) Use Set-FileStorageTier to pin the file to the SSD tier",
+        "C) Move the file to a separate Simple virtual disk on SSDs only",
+        "D) Disable the tiering optimization scheduled task"
+      ],
+      "correct": "B",
+      "explanation": "Set-FileStorageTier -FilePath <path> -DesiredStorageTierFriendlyName 'SSD_Tier' pins the file permanently to the SSD tier, preventing the heat map optimization from ever moving it to HDD. Increasing the tier size (A) doesn't guarantee placement. Moving to a separate disk (C) works but is unnecessarily complex. Disabling the scheduled task (D) would stop all tiering optimization, not just for this file.",
+      "followup_tip": "Run Set-FileStorageTier -FilePath 'D:\\Databases\\critical.mdf' -DesiredStorageTierFriendlyName 'SSD_Tier' and verify with Get-FileStorageTier -FilePath 'D:\\Databases\\critical.mdf'."
+    },
+    {
+      "id": "L100-Q3",
+      "scenario": "A customer is planning a 4-node S2D cluster with NVMe and SSD drives in each node. They ask why S2D isn't using the NVMe drives for read caching, only for write caching.",
+      "question": "Why does S2D skip read caching when NVMe is the cache tier and SSD is the capacity tier?",
+      "choices": [
+        "A) NVMe drives don't support read cache operations in S2D",
+        "B) Read caching is disabled by default and must be enabled manually",
+        "C) SSDs are already fast enough for reads, so caching SSD reads on NVMe provides minimal benefit",
+        "D) The Software Storage Bus only supports write operations across nodes"
+      ],
+      "correct": "C",
+      "explanation": "When the capacity tier is SSD, read latency is already very low. Caching SSD reads on NVMe would yield negligible improvement while consuming valuable NVMe capacity that is better used for write caching. S2D intelligently reserves NVMe cache entirely for writes in NVMe+SSD configurations. When the capacity tier is HDD (much slower for reads), S2D enables both read and write caching on the faster tier.",
+      "followup_tip": "Check the current cache configuration with Get-ClusterS2D | Select CacheState, CacheMetadataReserveBytes and verify drive roles with Get-PhysicalDisk | Select FriendlyName, MediaType, Usage."
+    },
+    {
+      "id": "L100-Q4",
+      "scenario": "A customer wants to deploy a SQL Server Failover Cluster Instance (FCI) on two Azure VMs. They need shared storage accessible by both VMs simultaneously for the cluster's disk witness and SQL data.",
+      "question": "Which Azure feature should you recommend and what is a critical configuration requirement?",
+      "choices": [
+        "A) Azure Files with SMB — mount the same share on both VMs",
+        "B) Azure Shared Disks with maxShares ≥ 2 — requires SCSI Persistent Reservations support",
+        "C) Azure Blob Storage — use iSCSI targets for shared access",
+        "D) Azure NetApp Files — provides native NFS multi-attach"
+      ],
+      "correct": "B",
+      "explanation": "Azure Shared Disks allow a managed disk to be attached to multiple VMs simultaneously using the maxShares property. The cluster uses SCSI Persistent Reservations (SCSI PR) to coordinate disk ownership between nodes, which is the same mechanism used by on-premises SAN clusters. This is the supported approach for SQL FCI on Azure. Azure Files (A) doesn't support the disk semantics required by WSFC physical disk resources. Blob Storage (C) and NetApp Files (D) aren't designed for this use case.",
+      "followup_tip": "Verify shared disk attachment with: az disk show -n MyDisk -g MyRG --query 'maxShares' and ensure host caching is set to None for shared disks."
+    }
+  ],
+  "L200": [
+    {
+      "id": "L200-Q1",
+      "scenario": "A customer reports that their Storage Spaces pool shows HealthStatus 'Warning' and OperationalStatus 'Degraded'. One of the four physical disks in the pool shows HealthStatus 'Unhealthy' with OperationalStatus 'Lost Communication'. The virtual disk is a two-way mirror and is still online.",
+      "question": "What is the correct sequence of actions to resolve this?",
+      "choices": [
+        "A) Immediately remove the failed disk physically and insert a replacement",
+        "B) Run Repair-VirtualDisk first, then remove the failed disk when repair completes",
+        "C) Retire the failed disk with Set-PhysicalDisk -Usage Retired, wait for data evacuation, then physically replace it",
+        "D) Delete the virtual disk, replace the physical disk, and recreate the virtual disk"
+      ],
+      "correct": "C",
+      "explanation": "The correct workflow is to first retire the disk using Set-PhysicalDisk -Usage Retired, which triggers data evacuation — S2D/Storage Spaces will rebuild the affected data copies onto remaining healthy disks. After evacuation completes (monitor with Get-StorageJob), you can safely remove the physical disk and insert a replacement. Simply yanking the disk (A) risks data loss if another disk fails during rebuild. Running Repair-VirtualDisk first (B) can work but retiring is the proper managed workflow. Deleting the virtual disk (D) destroys data unnecessarily.",
+      "followup_tip": "Run: Set-PhysicalDisk -SerialNumber '<serial>' -Usage Retired, then monitor with Get-StorageJob | Format-Table Name, JobState, PercentComplete."
+    },
+    {
+      "id": "L200-Q2",
+      "scenario": "After a node reboot in a 3-node S2D cluster, the customer reports that two virtual disks show OperationalStatus 'InService' and Get-StorageJob shows active repair jobs at 15% complete. VM workloads are experiencing noticeably higher latency.",
+      "question": "What is happening and how should you advise the customer?",
+      "choices": [
+        "A) The virtual disks are corrupted and need to be recreated immediately",
+        "B) S2D is rebuilding data copies that were stale during the node outage; this is expected and will complete automatically",
+        "C) The storage pool has lost quorum and is in read-only mode; restart the cluster service",
+        "D) The cache drives on the rebooted node have failed; replace them before continuing"
+      ],
+      "correct": "B",
+      "explanation": "When a node goes offline and comes back, S2D needs to re-synchronize any data that changed on other nodes while it was down. The 'InService' operational status means repair/resync is in progress. This is completely expected behavior. The storage jobs show the resync progress at 15%. During this process, additional I/O is generated across the storage network (reading source copies, writing repaired copies), which explains the increased VM latency. The process will complete automatically and latency will return to normal.",
+      "followup_tip": "Monitor progress with: Get-StorageJob | Format-Table Name, JobState, PercentComplete, BytesProcessed, BytesTotal — and check Get-VirtualDisk | Select FriendlyName, HealthStatus, OperationalStatus to confirm state returns to Healthy/OK."
+    },
+    {
+      "id": "L200-Q3",
+      "scenario": "A customer has two Azure VMs in a failover cluster using an Azure Shared Disk (Premium SSD, maxShares=2). After a failover, the second node cannot bring the clustered disk resource online. Event logs show SCSI reservation conflict errors.",
+      "question": "What is the most likely cause and resolution?",
+      "choices": [
+        "A) The disk needs to be detached from the first VM and reattached to the second VM",
+        "B) Premium SSD does not support SCSI Persistent Reservations; switch to Ultra Disk",
+        "C) Stale SCSI reservations from the first node are blocking the second node; clear reservations and restart the cluster resource",
+        "D) The maxShares value must be increased to 3 to allow failover operations"
+      ],
+      "correct": "C",
+      "explanation": "Azure Shared Disks use SCSI Persistent Reservations for cluster coordination. During failover, the original node should release its reservation so the new owner can acquire it. If the first node crashed without cleanly releasing (e.g., sudden power loss), stale reservations can remain, blocking the second node. The resolution is to clear the stale reservation and restart the cluster disk resource. Premium SSD does support SCSI PR (B is incorrect). maxShares=2 is sufficient for a 2-node cluster (D is incorrect). Detaching/reattaching (A) would break the shared disk configuration.",
+      "followup_tip": "Check cluster disk status with: Get-ClusterResource | Where-Object ResourceType -eq 'Physical Disk' | Format-Table Name, State, OwnerNode — and review SCSI errors with Get-WinEvent -FilterHashtable @{LogName='System'; ProviderName='disk'} -MaxEvents 20."
+    }
+  ],
+  "L300": [
+    {
+      "id": "L300-Q1",
+      "scenario": "A customer is deploying a 4-node S2D cluster and asks about RDMA network configuration. Their data center switches do not support Data Center Bridging (DCB) or Priority Flow Control (PFC). They have standard 25 GbE Ethernet switches.",
+      "question": "Which RDMA technology should you recommend and why?",
+      "choices": [
+        "A) RoCE v2 — it provides the highest performance on 25 GbE networks",
+        "B) iWARP — it works over standard TCP/IP and does not require lossless network (DCB/PFC)",
+        "C) InfiniBand — it bypasses Ethernet entirely and avoids the DCB requirement",
+        "D) Disable RDMA and use standard SMB over TCP — RDMA is optional for S2D"
+      ],
+      "correct": "B",
+      "explanation": "iWARP (Internet Wide Area RDMA Protocol) operates over standard TCP/IP and is tolerant of packet loss, meaning it does not require Data Center Bridging (DCB) or Priority Flow Control (PFC) on the switches. RoCE v2 (A) delivers high performance but requires a lossless network fabric with DCB/PFC configured — without it, performance degrades severely or connections fail. InfiniBand (C) requires dedicated InfiniBand switches, not Ethernet. While S2D technically works without RDMA (D), Microsoft strongly recommends RDMA for production — disabling it significantly reduces storage performance.",
+      "followup_tip": "Verify RDMA capability with: Get-NetAdapterRdma | Format-Table Name, Enabled, OperationalStatus and test connectivity with Test-Rdma -IfIndex <idx> -IsRoCE $false -RemoteIpAddress <ip>."
+    },
+    {
+      "id": "L300-Q2",
+      "scenario": "A customer has a 2-node S2D cluster running critical workloads. They are concerned that if one node goes down for maintenance and a disk fails on the remaining node simultaneously, they could lose data. They want to understand their options for improving resiliency without adding more nodes.",
+      "question": "What should you recommend?",
+      "choices": [
+        "A) Configure three-way mirror virtual disks for maximum fault tolerance",
+        "B) Use nested two-way mirror resiliency, which survives simultaneous node + disk failure on the surviving node",
+        "C) Add Storage Replica for synchronous replication to a third standalone server",
+        "D) Use dual parity for maximum fault tolerance on 2-node clusters"
+      ],
+      "correct": "B",
+      "explanation": "Nested two-way mirror is specifically designed for 2-node S2D clusters. It creates a two-way mirror between nodes AND a two-way mirror within each node (4 copies total). This means even if one entire node is offline and a disk fails on the surviving node, data is still accessible from the remaining local copy. Three-way mirror (A) requires at least 5 fault domains/nodes in S2D. Storage Replica (C) provides DR replication, not within-cluster resiliency. Dual parity (D) requires 7+ nodes in S2D and doesn't solve the 2-node problem.",
+      "followup_tip": "Create nested mirror volume with: New-Volume -FriendlyName 'CriticalVol' -StoragePoolFriendlyName 'S2D*' -Size 1TB -FileSystem CSVFS_ReFS -ResiliencySettingName 'NestedMirror'."
+    }
+  ]
+}

@@ -1,0 +1,134 @@
+{
+  "L100": [
+    {
+      "id": "L100-Q1",
+      "scenario": "A Hyper-V admin is migrating from standalone Hyper-V hosts to a failover cluster. Currently, each host has its own local storage for VMs. They ask: 'Why can't I just use regular cluster disks for my VMs? Why do I need CSV?'",
+      "question": "What is the primary advantage of Cluster Shared Volumes over traditional cluster disks for Hyper-V workloads?",
+      "choices": [
+        "A) CSV volumes provide built-in data deduplication that traditional cluster disks do not support",
+        "B) CSV allows all cluster nodes to read and write the same volume simultaneously, enabling seamless live migration without disk failover",
+        "C) CSV volumes are automatically encrypted with BitLocker, whereas traditional cluster disks require manual setup",
+        "D) CSV provides faster raw disk I/O performance compared to traditional cluster disks due to kernel-level optimizations"
+      ],
+      "correct": "B",
+      "explanation": "Traditional cluster disks are owned by one node at a time. If a VM needs to live migrate, the disk resource must fail over first, causing a brief interruption. CSV eliminates this by allowing all nodes to access the same volume concurrently through the CSVFS filter driver. The coordinator node handles metadata, while all nodes can perform data I/O directly to storage. This is what makes seamless live migration possible.",
+      "followup_tip": "Run `Get-ClusterSharedVolume | Format-Table Name, State, OwnerNode` to see all CSV volumes and their current coordinator nodes."
+    },
+    {
+      "id": "L100-Q2",
+      "scenario": "An admin notices that a CSV volume on their 3-node Hyper-V cluster is showing 'FileSystemRedirected' when they run Get-ClusterSharedVolumeState. The VMs are still running but users report slightly higher latency.",
+      "question": "What does 'File System Redirected I/O' mode mean for how data flows in CSV?",
+      "choices": [
+        "A) All data I/O and metadata I/O are routed through the coordinator node over the network",
+        "B) Data I/O goes directly to storage from each node, but metadata operations go through the coordinator with heavier overhead than normal",
+        "C) Only write I/O is redirected through the coordinator; reads still go directly to storage",
+        "D) The volume is completely offline and no I/O can proceed until the issue is resolved"
+      ],
+      "correct": "B",
+      "explanation": "File System Redirected I/O is a partial redirection mode. Data I/O (reads/writes of actual file blocks) still goes directly from each node to storage, but metadata operations (file create, delete, rename) are handled by the coordinator with heavier processing than normal Direct I/O mode. This typically occurs when the NTFS dirty bit is set or chkdsk is needed. It's less severe than full Block Redirected I/O where ALL I/O goes through the coordinator, but still indicates an issue to investigate.",
+      "followup_tip": "Check the specific reason: `Get-ClusterSharedVolume | Get-ClusterSharedVolumeState | Select-Object VolumeName, StateInfo, FileSystemRedirectedIOReason`"
+    },
+    {
+      "id": "L100-Q3",
+      "scenario": "A new cluster admin is trying to understand CSV volume ownership. They see that 'Cluster Disk 2' has OwnerNode = NodeA, but VMs stored on that CSV volume are running on NodeB and NodeC with no issues.",
+      "question": "What is the role of the coordinator (owner) node for a CSV volume?",
+      "choices": [
+        "A) The coordinator is the only node that can run VMs stored on that CSV volume",
+        "B) The coordinator handles file system metadata operations (create, delete, rename) while all nodes can perform data I/O directly",
+        "C) The coordinator caches all data in RAM before distributing it to other nodes for performance",
+        "D) The coordinator is responsible for replicating data across all nodes for fault tolerance"
+      ],
+      "correct": "B",
+      "explanation": "The coordinator (owner) node is the only node that mounts the NTFS/ReFS file system natively. It handles all metadata operations — file creation, deletion, renaming, and security descriptor changes — forwarded from non-coordinator nodes via the MDS protocol. However, in Direct I/O mode, all nodes can read and write data blocks directly to storage without involving the coordinator. This is why VMs can run on any node regardless of which node is the coordinator.",
+      "followup_tip": "Move the coordinator with: `Move-ClusterSharedVolume -Name 'Cluster Disk 2' -Node 'NodeB'` — useful for load balancing metadata operations across nodes."
+    },
+    {
+      "id": "L100-Q4",
+      "scenario": "A Hyper-V admin needs to create a script that references VM configuration files on CSV volumes. They want to use the same path from any cluster node. They notice the mount point is C:\\ClusterStorage\\Volume1 on all nodes.",
+      "question": "Which statement about the CSV namespace (C:\\ClusterStorage) is correct?",
+      "choices": [
+        "A) Each node sees a different path — NodeA sees C:\\ClusterStorage\\Volume1 but NodeB sees C:\\ClusterStorage\\Volume2 for the same disk",
+        "B) The C:\\ClusterStorage folder is a reparse point managed by CSVFS, and the path C:\\ClusterStorage\\VolumeN is identical and accessible from every cluster node",
+        "C) The C:\\ClusterStorage path is only accessible on the coordinator node; other nodes must use a UNC path like \\\\ClusterName\\Volume1",
+        "D) Administrators must manually create the C:\\ClusterStorage folder and configure mount points on each node"
+      ],
+      "correct": "B",
+      "explanation": "The C:\\ClusterStorage folder is a special reparse point managed by the CSVFS filter driver. When a disk is added to CSV, it is automatically mounted under C:\\ClusterStorage\\VolumeN, and this exact same path is visible and accessible from every cluster node simultaneously. This unified namespace is what makes CSV so powerful — applications and scripts can use a single path regardless of which node they run on. Admins should never manually create or delete folders under C:\\ClusterStorage.",
+      "followup_tip": "List all CSV mount points and free space: `Get-ClusterSharedVolume | Select-Object Name, @{N='Path';E={$_.SharedVolumeInfo.FriendlyVolumeName}}, @{N='FreeGB';E={[math]::Round($_.SharedVolumeInfo.Partition.FreeSpace/1GB,2)}}`"
+    }
+  ],
+  "L200": [
+    {
+      "id": "L200-Q1",
+      "scenario": "A 4-node Hyper-V cluster admin notices VMs on one CSV volume have become sluggish. They run Get-ClusterSharedVolumeState and see StateInfo shows 'BlockRedirected' for all non-coordinator nodes. The BlockRedirectedIOReason shows 'NoDiskConnectivity'.",
+      "question": "What is the most likely cause and immediate action for this CSV block redirection?",
+      "choices": [
+        "A) The coordinator node has too many VMs — live migrate some VMs to other nodes to reduce load",
+        "B) The NTFS dirty bit is set on the volume — run chkdsk /F from the coordinator node",
+        "C) One or more non-coordinator nodes have lost SAN connectivity — check HBA, fiber channel, or iSCSI paths on affected nodes",
+        "D) The cluster network for CSV traffic is saturated — add more network bandwidth between nodes"
+      ],
+      "correct": "C",
+      "explanation": "BlockRedirectedIOReason = 'NoDiskConnectivity' means the non-coordinator nodes cannot directly access the underlying storage. All their I/O must be redirected through the coordinator node via the cluster network, which explains the performance degradation. The most common cause is a SAN connectivity issue — failed HBA, disconnected fiber channel cable, iSCSI session timeout, or MPIO path failure on the affected nodes. Immediate action is to check storage connectivity (HBA status, multipath status, iSCSI sessions) on the non-coordinator nodes.",
+      "followup_tip": "Check multipath status: `mpclaim -s -d` or `Get-MSDSMSupportedHW` and verify iSCSI sessions with `iscsicli SessionList` on the affected non-coordinator nodes."
+    },
+    {
+      "id": "L200-Q2",
+      "scenario": "After a power outage, a cluster comes back online but one CSV volume shows 'FileSystemRedirected' on all nodes. The FileSystemRedirectedIOReason shows 'FileSystemOnDiskNotCleanlyShutdown'. VMs are running but with degraded performance.",
+      "question": "What is the correct procedure to return this CSV volume to Direct I/O mode?",
+      "choices": [
+        "A) Restart the Cluster Service on all nodes simultaneously to force a clean remount",
+        "B) Move the coordinator to a different node — the new coordinator will perform a clean mount automatically",
+        "C) Put the volume in maintenance mode with Suspend-ClusterResource, run chkdsk /F on the volume, then resume with Resume-ClusterResource",
+        "D) Remove the volume from CSV and re-add it — this forces a clean mount"
+      ],
+      "correct": "C",
+      "explanation": "When the NTFS dirty bit is set (due to unclean shutdown), the volume enters File System Redirected I/O because NTFS needs repair before it can be trusted for concurrent direct access. The correct procedure is: (1) Suspend the CSV resource to enter maintenance mode, which allows exclusive access. (2) Run chkdsk /F to repair the file system and clear the dirty bit. (3) Resume the resource with Resume-ClusterResource, which returns it to Direct I/O mode. Simply moving the coordinator or restarting the cluster service won't clear the dirty bit.",
+      "followup_tip": "Full sequence: `Suspend-ClusterResource 'Cluster Disk 1'` → `chkdsk C:\\ClusterStorage\\Volume1 /F` → `Resume-ClusterResource 'Cluster Disk 1'` → verify with `Get-ClusterSharedVolumeState`."
+    },
+    {
+      "id": "L200-Q3",
+      "scenario": "A cluster admin configured a new antivirus solution across all Hyper-V cluster nodes. Within hours, several CSV volumes began showing 'FileSystemRedirected' with reason 'IncompatibleFileSystemFilter'. VM performance dropped significantly.",
+      "question": "What should the admin do to resolve this CSV redirection caused by the antivirus software?",
+      "choices": [
+        "A) Disable the antivirus entirely on all cluster nodes — CSV and antivirus are incompatible",
+        "B) Configure the antivirus to exclude CSV paths (C:\\ClusterStorage\\), virtual disk file types (.vhd, .vhdx), and cluster processes (clussvc.exe, rhs.exe)",
+        "C) Move all CSV coordinator ownership to one node and install antivirus only on non-coordinator nodes",
+        "D) Upgrade the cluster to the latest Windows Server version where this incompatibility is fixed"
+      ],
+      "correct": "B",
+      "explanation": "The 'IncompatibleFileSystemFilter' reason indicates that the antivirus file system filter driver is not CSV-aware and interferes with the CSVFS filter driver. The solution is NOT to disable AV entirely, but to properly configure exclusions. CSV requires: path exclusions for C:\\ClusterStorage\\ and %systemroot%\\Cluster\\, file type exclusions for .vhd/.vhdx/.avhd/.avhdx/.vsv/.iso, and process exclusions for clussvc.exe and rhs.exe. Most enterprise AV products have specific CSV-aware modes or pre-configured templates for Hyper-V clusters.",
+      "followup_tip": "After configuring AV exclusions, verify recovery: `Get-ClusterSharedVolume | Get-ClusterSharedVolumeState | Select-Object VolumeName, StateInfo, FileSystemRedirectedIOReason` — StateInfo should return to 'Direct'."
+    }
+  ],
+  "L300": [
+    {
+      "id": "L300-Q1",
+      "scenario": "An admin managing a 200-VM VDI cluster on a 4-node Hyper-V cluster notices severe storage I/O during morning boot storms when all virtual desktops start simultaneously. All VMs use differencing disks from shared parent VHDXs stored on CSV volumes. The admin has 256 GB RAM per node with only 60% utilized.",
+      "question": "Which CSV Block Cache configuration would best address the VDI boot storm performance issue?",
+      "choices": [
+        "A) Set (Get-Cluster).BlockCacheSize = 0 because block cache adds overhead and VDI workloads are write-heavy during boot",
+        "B) Set (Get-Cluster).BlockCacheSize = 2048 or higher to cache the shared parent VHDX blocks that all VMs read during boot, then restart the Cluster Service on each node",
+        "C) Set (Get-Cluster).BlockCacheSize = 512 and also increase the SQL Server buffer pool to compensate",
+        "D) Block cache is only effective with SSD storage tiers; it provides no benefit on this HDD-based SAN"
+      ],
+      "correct": "B",
+      "explanation": "VDI boot storms are the ideal use case for CSV Block Cache. During boot, all VMs read the same OS blocks from the shared parent VHDX — these are repeated random reads of the same data. With 2048 MB (or more, given 256 GB RAM with 40% free) of block cache per node, these frequently-read blocks are served from RAM instead of hitting storage. The cache is read-through, so after the first VM reads a block from disk, subsequent VMs get it from cache. Since boot is read-dominated (not write-heavy), the read-only cache provides maximum benefit. The Cluster Service must be restarted on each node for the setting to take effect.",
+      "followup_tip": "Enable and verify: `(Get-Cluster).BlockCacheSize = 2048` then monitor effectiveness with PerfMon counter `\\Cluster CSV Volume Cache\\Cache IO Read - Bytes` vs `\\Cluster CSV Volume Cache\\IO Read - Bytes`."
+    },
+    {
+      "id": "L300-Q2",
+      "scenario": "A Storage Spaces Direct (S2D) cluster with 4 nodes uses 3-way mirror virtual disks presented as CSV volumes. After replacing a failed NVMe drive in Node C, the admin notices one CSV volume intermittently shows 'FileSystemRedirected' for a few minutes, then returns to 'Direct'. This pattern repeats every 30-60 minutes.",
+      "question": "What is the most likely explanation for this intermittent CSV redirection on the S2D cluster?",
+      "choices": [
+        "A) The replacement NVMe drive is incompatible with S2D and must be replaced with the exact same model",
+        "B) Storage Spaces Direct is rebuilding the mirror copies onto the new drive, and the storage repair jobs periodically cause transient CSV redirection during data rebalancing",
+        "C) The CSVFS filter driver on Node C needs to be reinstalled because the driver cache was corrupted when the drive failed",
+        "D) The CSV Block Cache is full and overflowing, causing periodic flushes that trigger redirection"
+      ],
+      "correct": "B",
+      "explanation": "After replacing a failed drive in an S2D cluster, Storage Spaces must rebuild (re-silver) the mirror copies that were on the failed drive onto the new drive. This repair process runs in the background and periodically performs intensive I/O operations. During the most intensive phases of the repair, the S2D stack may cause the NTFS/ReFS volume to briefly enter File System Redirected I/O while it handles internal consistency operations. This is a normal transient behavior that resolves once the repair job completes. The intermittent pattern (30-60 minute intervals) matches the typical behavior of S2D repair jobs processing data in batches.",
+      "followup_tip": "Monitor the rebuild progress: `Get-StorageJob | Format-Table Name, JobState, PercentComplete, BytesProcessed, BytesTotal` — once the repair job completes (100%), the intermittent redirection will stop."
+    }
+  ]
+}

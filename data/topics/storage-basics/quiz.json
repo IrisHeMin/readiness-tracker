@@ -1,0 +1,134 @@
+{
+  "L100": [
+    {
+      "id": "L100-Q1",
+      "scenario": "A customer is migrating a file server from Windows Server 2012 to 2022. The legacy server uses MBR-partitioned disks with a 3 TB data volume. After cloning the disk to the new server, only 2 TB of the 3 TB disk is visible.",
+      "question": "What is the most likely cause of the missing capacity?",
+      "choices": [
+        "A) The NTFS filesystem has a 2 TB limit",
+        "B) MBR partition style has a maximum addressable size of 2 TB",
+        "C) The disk class driver disk.sys does not support disks larger than 2 TB",
+        "D) The Volume Manager failed to enumerate the extended partition"
+      ],
+      "correct": "B",
+      "explanation": "MBR uses 32-bit Logical Block Addressing (LBA), which limits the maximum addressable disk size to 2 TB (2^32 × 512 bytes). Any capacity beyond 2 TB is invisible to the operating system when using MBR. The disk must be converted to GPT to access the full 3 TB. NTFS itself supports volumes up to 256 TB, so option A is incorrect.",
+      "followup_tip": "Convert the disk to GPT using: `Set-Disk -Number 1 -PartitionStyle GPT` (requires empty disk) or use `mbr2gpt /convert /disk:1` for in-place conversion on supported configurations."
+    },
+    {
+      "id": "L100-Q2",
+      "scenario": "A support engineer is troubleshooting a Hyper-V host where virtual machines experience intermittent I/O errors. The VMs use VHD files on a local NTFS volume. The physical disk is healthy and the host OS has no errors.",
+      "question": "What is the first improvement the engineer should recommend for the VM storage configuration?",
+      "choices": [
+        "A) Convert the VHD files to VHDX format",
+        "B) Move the VMs to a ReFS volume",
+        "C) Enable BitLocker on the host volume",
+        "D) Increase the NTFS cluster size to 64 KB"
+      ],
+      "correct": "A",
+      "explanation": "VHD format lacks log-based metadata protection, meaning a host crash or power failure during a write operation can leave the VHD file in an inconsistent state. VHDX uses an internal log to protect metadata updates, making it resilient to corruption from unexpected shutdowns. VHDX also supports larger sizes (64 TB vs 2 TB) and 4 KB logical sectors for better alignment with modern disks.",
+      "followup_tip": "Convert VHD to VHDX with Hyper-V Manager or PowerShell: `Convert-VHD -Path 'C:\\VMs\\disk.vhd' -DestinationPath 'C:\\VMs\\disk.vhdx' -VHDType Dynamic`"
+    },
+    {
+      "id": "L100-Q3",
+      "scenario": "A customer calls because their C: drive is running low on space. There is 50 GB of unallocated space immediately adjacent (to the right) of the C: partition on the same disk. They want to extend C: without any downtime.",
+      "question": "Which PowerShell command should the engineer guide the customer to use?",
+      "choices": [
+        "A) New-Partition -DiskNumber 0 -Size 50GB -DriveLetter C",
+        "B) Resize-Partition -DriveLetter C -Size ((Get-Partition -DriveLetter C).Size + 50GB)",
+        "C) Format-Volume -DriveLetter C -FileSystem NTFS -Force",
+        "D) Set-Partition -DriveLetter C -Size 50GB"
+      ],
+      "correct": "B",
+      "explanation": "Resize-Partition extends or shrinks an existing partition. The -Size parameter specifies the new total size, so you must add the desired additional space to the current size. New-Partition creates a new partition rather than extending an existing one. Format-Volume would destroy all data. Set-Partition does not accept a -Size parameter. NTFS online extend is supported natively — no downtime required when extending into adjacent free space.",
+      "followup_tip": "To get the maximum supported size for a partition before extending: `$max = (Get-PartitionSupportedSize -DriveLetter C).SizeMax; Resize-Partition -DriveLetter C -Size $max`"
+    },
+    {
+      "id": "L100-Q4",
+      "scenario": "An engineer is explaining the Windows storage stack to a junior team member. The junior asks why an application write can succeed from the app's perspective but the data may not reach the physical disk immediately.",
+      "question": "Which layer of the storage stack is primarily responsible for this behavior?",
+      "choices": [
+        "A) The miniport driver buffers I/O in HBA firmware",
+        "B) The filesystem driver (ntfs.sys) uses a write-back cache with lazy writer",
+        "C) The partition manager delays writes to optimize partition alignment",
+        "D) The Storport driver reorders writes for sequential access patterns"
+      ],
+      "correct": "B",
+      "explanation": "NTFS uses a write-back caching mechanism managed by the Cache Manager and Lazy Writer. When an application writes data, it is placed into the filesystem cache (backed by system memory). The Lazy Writer flushes dirty pages to disk asynchronously. This is why an application write can return success before data is physically persisted. Storport does manage I/O queues but does not cache data. The HBA firmware may have a write cache as well, but that is below the OS layer the question targets.",
+      "followup_tip": "To force an immediate flush to disk in application code, use `FlushFileBuffers()`. In PowerShell, check write cache policy: `Get-PhysicalDisk | Get-StorageReliabilityCounter` and disk properties in Device Manager → Policies tab."
+    }
+  ],
+  "L200": [
+    {
+      "id": "L200-Q1",
+      "scenario": "A customer reports that their Windows Server 2022 machine loses connectivity to an iSCSI SAN every night around 2:00 AM. The iSCSI sessions reconnect automatically after about 30 seconds. The SAN vendor confirms no maintenance window at that time. Network team confirms no outages.",
+      "question": "What should the engineer check first on the Windows server?",
+      "choices": [
+        "A) Verify the iSCSI target IQN has not changed",
+        "B) Check if a NIC power management policy is putting the iSCSI adapter to sleep",
+        "C) Reinstall the Microsoft iSCSI Initiator service",
+        "D) Change the MPIO path policy from Round Robin to Failover Only"
+      ],
+      "correct": "B",
+      "explanation": "Scheduled, recurring connectivity drops — especially during low-activity periods like 2:00 AM — are a classic symptom of NIC power management. Windows may put the network adapter to sleep to save energy, disconnecting the iSCSI sessions. The sessions then reconnect when the adapter wakes up. This is especially common on adapters with 'Allow the computer to turn off this device to save power' enabled in Device Manager.",
+      "followup_tip": "Disable NIC power management: `Get-NetAdapter -Name 'iSCSI*' | Disable-NetAdapterPowerManagement` or in Device Manager → NIC → Power Management tab → uncheck 'Allow the computer to turn off this device to save power'."
+    },
+    {
+      "id": "L200-Q2",
+      "scenario": "A customer has a Windows Server 2019 failover cluster connected to an iSCSI SAN via two separate network paths. They have installed the MPIO feature and configured Round Robin policy. During a scheduled path failover test, all I/O to the clustered disk pauses for 60+ seconds before resuming on the alternate path.",
+      "question": "What is the most likely configuration issue causing the long failover time?",
+      "choices": [
+        "A) The disk is formatted with a 512-byte allocation unit size",
+        "B) The MPIO path verification period (PDO Removal Period) is set too high",
+        "C) Round Robin policy does not support failover — they should use Failover Only",
+        "D) The iSCSI sessions are not configured as persistent"
+      ],
+      "correct": "B",
+      "explanation": "The PDO (Physical Device Object) Removal Period in MPIO determines how long the system waits before declaring a path dead and failing over. The default is 20 seconds, but some configurations have this set much higher (60-120 seconds), which directly correlates with the pause duration during failover. Round Robin does support failover — it will remove the failed path and continue distributing I/O across remaining paths. The allocation unit size and persistent logins do not affect failover timing.",
+      "followup_tip": "Check and adjust the MPIO timers: `Get-MPIOSetting` to view current values. Set the PDO Remove Period: `Set-MPIOSetting -NewPDORemovePeriod 20 -NewRetryCount 3 -NewDiskTimeout 60` and reboot."
+    },
+    {
+      "id": "L200-Q3",
+      "scenario": "A customer complains that their SQL Server database is slow. PerfMon data shows Avg. Disk sec/Write at 35 ms for the data volume and Current Disk Queue Length averaging 8. The server has a single SAS HDD for the data volume.",
+      "question": "Based on the PerfMon data, what is the correct diagnosis?",
+      "choices": [
+        "A) The disk is healthy but the SQL queries need optimization",
+        "B) The storage subsystem is saturated — latency exceeds the 25 ms threshold and queue depth is high for a single spindle",
+        "C) The write latency is within normal range for enterprise SAS drives",
+        "D) The high queue length indicates a network bottleneck between SQL and the client"
+      ],
+      "correct": "B",
+      "explanation": "Avg. Disk sec/Write at 35 ms exceeds the 25 ms degraded threshold, indicating the disk cannot keep up with the write demand. A Current Disk Queue Length of 8 on a single spindle (where > 2× spindle count = congested) confirms the storage subsystem is the bottleneck. A single SAS HDD typically delivers 150-200 IOPS — insufficient for a busy SQL workload. The recommendation is to move to SSD/NVMe or a SAN LUN with multiple spindles.",
+      "followup_tip": "Capture a performance baseline: `Get-Counter '\\PhysicalDisk(*)\\Avg. Disk sec/Write','\\PhysicalDisk(*)\\Current Disk Queue Length' -SampleInterval 5 -MaxSamples 60 | Export-Counter C:\\Logs\\diskperf.blg`"
+    }
+  ],
+  "L300": [
+    {
+      "id": "L300-Q1",
+      "scenario": "A customer's Windows Server 2019 file server experienced an unexpected power loss. After reboot, users report that some files in a shared folder are inaccessible with 'The file or directory is corrupted and unreadable' errors. The server is production and hosts 8 TB of data.",
+      "question": "What is the safest approach to resolve the corruption with minimal downtime?",
+      "choices": [
+        "A) Run `chkdsk /R` immediately on the affected volume",
+        "B) Run `chkdsk /scan` first for online assessment, then schedule `chkdsk /spotfix` during a maintenance window",
+        "C) Format the volume and restore from backup",
+        "D) Run `sfc /scannow` to repair the corrupted system files"
+      ],
+      "correct": "B",
+      "explanation": "On Server 2012 and later, the recommended approach for production volumes is to first run `chkdsk /scan` which performs an online scan without requiring exclusive volume access. This identifies the specific corruptions. Then schedule `chkdsk /spotfix` during a short maintenance window — it only fixes the issues found by /scan, requiring only seconds to minutes of offline time. Running `chkdsk /R` on an 8 TB volume could take many hours and requires exclusive access (dismounting the volume), causing extended downtime. `sfc /scannow` repairs OS system files, not NTFS volume corruption.",
+      "followup_tip": "Run the online scan first: `chkdsk D: /scan` — then review results in Application Event Log under source 'Wininit' or 'Chkdsk'. Schedule spotfix: `chkdsk D: /spotfix` which requires a brief volume dismount."
+    },
+    {
+      "id": "L300-Q2",
+      "scenario": "A support engineer sees the following pattern in the System event log of a Windows Server: multiple Event ID 153 (disk, Warning) entries occurring every few minutes for the past 48 hours on Disk 2, followed by occasional Event ID 129 (storahci, Warning) device resets. The server uses a local NVMe SSD.",
+      "question": "What is the most likely root cause and recommended next step?",
+      "choices": [
+        "A) The NTFS filesystem is corrupted — run chkdsk /F immediately",
+        "B) The NVMe driver is outdated — update the storahci driver",
+        "C) The SSD is experiencing media degradation — check S.M.A.R.T. counters and plan proactive replacement",
+        "D) The events are informational and can be safely ignored"
+      ],
+      "correct": "C",
+      "explanation": "Event ID 153 indicates the disk driver had to retry an I/O operation, and Event ID 129 indicates the controller had to reset the device due to an I/O timeout. A sustained pattern of these events over 48 hours on an NVMe SSD strongly suggests media degradation — sectors are failing and the drive firmware is struggling to complete I/Os. The next step is to check S.M.A.R.T. reliability counters (Uncorrectable Errors, Pending Sectors, Wear Level). If degradation is confirmed, schedule a proactive disk replacement before a complete failure occurs. While driver updates are worth checking, the sustained pattern points to hardware rather than software.",
+      "followup_tip": "Check SSD health immediately: `Get-PhysicalDisk -DeviceNumber 2 | Get-StorageReliabilityCounter | Select ReadErrorsUncorrected, WriteErrorsUncorrected, Wear, Temperature` — if uncorrected errors > 0 or wear is high, initiate replacement."
+    }
+  ]
+}

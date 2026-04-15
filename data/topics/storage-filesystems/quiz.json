@@ -1,0 +1,134 @@
+{
+  "L100": [
+    {
+      "id": "L100-Q1",
+      "scenario": "A junior engineer asks you which NTFS metadata file is responsible for replaying incomplete transactions after a system crash to bring the filesystem back to a consistent state.",
+      "question": "Which NTFS metadata file handles crash recovery by journaling metadata transactions?",
+      "choices": [
+        "A) $UsnJrnl – it records all file changes for recovery",
+        "B) $LogFile – it records metadata transactions for redo/undo on mount",
+        "C) $Bitmap – it tracks cluster allocation for consistency",
+        "D) $MFTMirr – it mirrors the MFT for redundancy"
+      ],
+      "correct": "B",
+      "explanation": "$LogFile is the NTFS transaction journal. It records metadata operations (create, rename, delete, permission change) so that if the system crashes mid-operation, NTFS can replay or undo incomplete transactions at next mount. $UsnJrnl is a change-tracking journal (not for crash recovery). $Bitmap tracks free/used clusters. $MFTMirr is a backup of the first 4 MFT records, not a transaction log.",
+      "followup_tip": "Run `fsutil fsinfo ntfsinfo C:` to see the $LogFile and $MFT sizes on a live volume."
+    },
+    {
+      "id": "L100-Q2",
+      "scenario": "Your team is deploying a new Hyper-V host with Storage Spaces Direct. The storage architect wants the best filesystem for VM storage volumes to enable instant VHDX creation and fast checkpoint merge operations.",
+      "question": "Which filesystem should be used for the Hyper-V storage volumes, and why?",
+      "choices": [
+        "A) NTFS – it supports compression which reduces VHDX size",
+        "B) ReFS – it supports block cloning for instant VHDX operations",
+        "C) NTFS – it supports EFS encryption for VM security",
+        "D) ReFS – it supports disk quotas for capacity management"
+      ],
+      "correct": "B",
+      "explanation": "ReFS block cloning allows Hyper-V to create fixed VHDX files and merge checkpoints in seconds by duplicating metadata pointers rather than physically copying data. This is a major performance advantage for virtualization workloads. NTFS compression and EFS are not relevant advantages for VM storage, and ReFS does not support disk quotas.",
+      "followup_tip": "Run `Get-Volume | Where-Object FileSystemType -eq 'ReFS'` to identify ReFS volumes on a Hyper-V host."
+    },
+    {
+      "id": "L100-Q3",
+      "scenario": "A customer wants to format a new data volume for their file server. They need disk quotas, per-file encryption (EFS), and NTFS compression. The volume will also serve as a boot volume for their Windows Server.",
+      "question": "Which filesystem meets all of these requirements?",
+      "choices": [
+        "A) ReFS – it supports all modern features and is the newer filesystem",
+        "B) NTFS – it supports quotas, EFS, compression, and can be a boot volume",
+        "C) Either NTFS or ReFS – both support these features equally",
+        "D) NTFS for boot and ReFS for data – split the requirements across volumes"
+      ],
+      "correct": "B",
+      "explanation": "Only NTFS supports all four requirements: disk quotas, EFS encryption, per-file compression, and boot volume capability. ReFS does not support any of these features. While ReFS excels in data integrity and large-scale storage, NTFS remains the only choice when compression, EFS, quotas, or boot support are needed.",
+      "followup_tip": "Remember the NTFS-only features with the mnemonic 'CEQB' – Compression, EFS, Quotas, Boot."
+    },
+    {
+      "id": "L100-Q4",
+      "scenario": "A customer reports confusion about filesystem links. They created a junction point to redirect C:\\Data to D:\\Archive, but now they need a link that can point to a network share (\\\\server\\share) and work for both files and directories.",
+      "question": "What should they use instead of a junction point?",
+      "choices": [
+        "A) A hard link – it can point to any target including network paths",
+        "B) A symbolic link – it supports files, directories, and UNC paths",
+        "C) Another junction point with the UNC path as the target",
+        "D) A shortcut (.lnk file) – it is the only option for network targets"
+      ],
+      "correct": "B",
+      "explanation": "Symbolic links (symlinks) can target both files and directories, and support remote UNC paths. Junction points only work with local directory paths. Hard links only work for files on the same volume and cannot span to network locations. While .lnk shortcuts can point to network paths, they are shell-level constructs and not transparent filesystem links.",
+      "followup_tip": "Create a symlink with `mklink /D LinkName \\\\server\\share` (requires SeCreateSymbolicLinkPrivilege)."
+    }
+  ],
+  "L200": [
+    {
+      "id": "L200-Q1",
+      "scenario": "A customer calls saying files on their D: drive are suddenly showing 'The file or directory is corrupted and unreadable.' The server is in production and they cannot afford extended downtime for a full chkdsk.",
+      "question": "What is the recommended approach to fix the corruption with minimal downtime?",
+      "choices": [
+        "A) Run `chkdsk D: /R` immediately – it performs a full repair",
+        "B) Run `chkdsk D: /scan` first (online), then `chkdsk D: /spotfix` for a brief offline fix",
+        "C) Run `sfc /scannow` to repair the filesystem corruption",
+        "D) Format the volume and restore from backup – corruption cannot be repaired online"
+      ],
+      "correct": "B",
+      "explanation": "The modern chkdsk workflow (Windows 8+) uses /scan for an online analysis that detects issues while the volume remains mounted, then /spotfix to apply queued fixes with only a momentary offline period. This is far less disruptive than /R, which requires the volume to be offline for the entire scan. `sfc /scannow` repairs Windows system files, not filesystem corruption. Formatting is a last resort.",
+      "followup_tip": "Always check the dirty bit first with `fsutil dirty query D:` – if set, the volume needs attention."
+    },
+    {
+      "id": "L200-Q2",
+      "scenario": "A user reports 'Access is denied' when trying to open files in C:\\SharedData. You verify the user has Full Control on the NTFS permissions and the share permissions also grant Full Control. The user is a member of the Domain Users group.",
+      "question": "What should you check next to find the root cause?",
+      "choices": [
+        "A) Check if there is an explicit Deny ACE on the folder that overrides the Allow",
+        "B) Check if the files are compressed – compression can block access",
+        "C) Restart the Server service to refresh the share permissions cache",
+        "D) Re-share the folder – the share permissions are probably corrupt"
+      ],
+      "correct": "A",
+      "explanation": "In NTFS, an explicit Deny ACE always overrides Allow permissions, regardless of how the Allow was granted (directly or via group membership). This is the most common cause of unexpected 'Access Denied' when the user appears to have correct permissions. Run `icacls C:\\SharedData` and look for any (DENY) entries. Compression does not block access, and re-sharing is unlikely to resolve an ACL issue.",
+      "followup_tip": "Run `icacls \"C:\\SharedData\" | findstr /i DENY` to quickly find any Deny ACEs in the permission list."
+    },
+    {
+      "id": "L200-Q3",
+      "scenario": "A security team wants to block all USB storage devices company-wide but still allow USB keyboards and mice. They plan to use Group Policy to enforce this restriction on all domain-joined workstations.",
+      "question": "Which GPO approach should they use?",
+      "choices": [
+        "A) Enable 'All Removable Storage: Deny all access' under Removable Storage Access",
+        "B) Block the Disk Drives device setup class GUID {4d36e967-e325-11ce-bfc1-08002be10318} under Device Installation Restrictions",
+        "C) Disable the USB Root Hub in Device Manager on each workstation",
+        "D) Block all USB controllers class GUID {36fc9e60-c465-11cf-8056-444553540000} under Device Installation Restrictions"
+      ],
+      "correct": "B",
+      "explanation": "Blocking the Disk Drives device setup class GUID ({4d36e967-e325-11ce-bfc1-08002be10318}) under Device Installation Restrictions prevents USB storage devices (flash drives, external HDDs) from being installed while allowing USB HID devices (keyboards, mice) to continue working. Option A blocks all removable storage access but does not distinguish by device type well. Option D would block all USB controllers including those for keyboards and mice. Disabling USB Root Hub would block all USB devices entirely.",
+      "followup_tip": "Verify the policy with `Get-ItemProperty 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\DeviceInstall\\Restrictions'`."
+    }
+  ],
+  "L300": [
+    {
+      "id": "L300-Q1",
+      "scenario": "During a forensic investigation, you need to determine which files were deleted from a server's C: drive in the last 24 hours without performing a full disk scan. The server has NTFS and the USN journal is enabled.",
+      "question": "How can you efficiently identify recently deleted files using the USN journal?",
+      "choices": [
+        "A) Run `chkdsk C: /scan` to find orphaned MFT records from deleted files",
+        "B) Check the Recycle Bin – all deleted files are always stored there",
+        "C) Read the USN journal with `fsutil usn readjournal C: csv` and filter for FILE_DELETE reason entries",
+        "D) Parse the $LogFile to find delete transactions from the last 24 hours"
+      ],
+      "correct": "C",
+      "explanation": "The USN journal ($UsnJrnl) records every file change including deletions. By reading the journal with `fsutil usn readjournal C: csv` and filtering for FILE_DELETE (reason code 0x00000200) combined with CLOSE (0x80000000), you can identify deleted files with their original names and parent directory references. The Recycle Bin does not capture all deletions (e.g., Shift+Delete, command-line deletion, application deletions). $LogFile is for crash recovery, not change tracking. chkdsk does not provide deletion history.",
+      "followup_tip": "Use `fsutil usn readjournal C: csv | findstr /i \"0x80000200\"` to filter for delete+close combined reason codes."
+    },
+    {
+      "id": "L300-Q2",
+      "scenario": "A file server is experiencing intermittent slow file I/O. Applications report delays when opening and saving files. The server hardware is healthy and disk latency counters are normal. You suspect a filesystem filter driver issue.",
+      "question": "What is the best first step to investigate a minifilter driver causing slow I/O?",
+      "choices": [
+        "A) Run `defrag C: /A` to check for filesystem fragmentation",
+        "B) Run `fltmc instances` to list all minifilter drivers attached to the volume and identify potential culprits",
+        "C) Run `chkdsk C: /R` to rule out filesystem corruption causing the slowness",
+        "D) Increase the disk cache size in Device Manager to improve I/O performance"
+      ],
+      "correct": "B",
+      "explanation": "Running `fltmc instances` lists all minifilter drivers attached to each volume, showing their names and altitudes. This is the correct first diagnostic step when suspecting a filter driver issue. Antivirus minifilters (altitude range 320000-329999) are the most common cause of I/O slowness as they intercept every read/write operation. Once identified, you can test by temporarily detaching the filter or booting to Safe Mode (which loads minimal filters). Defrag and chkdsk address different issues, and disk cache changes won't help with filter driver overhead.",
+      "followup_tip": "Run `fltmc filters` to see all loaded minifilters with altitudes, then cross-reference altitudes at the Microsoft filter altitude registry."
+    }
+  ]
+}

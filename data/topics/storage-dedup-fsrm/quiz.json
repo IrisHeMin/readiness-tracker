@@ -1,0 +1,134 @@
+{
+  "L100": [
+    {
+      "id": "L100-Q1",
+      "scenario": "A customer has enabled Data Deduplication on their general purpose file server volume. After a week, they notice that deduplicated files are not individual copies anymore — instead, each file stores references to shared data chunks. They want to understand what happens under the hood when dedup processes a file.",
+      "question": "Which sequence correctly describes how Data Deduplication processes files on a volume?",
+      "choices": [
+        "A) Files are compressed → compressed blocks are hashed → duplicates are deleted from disk",
+        "B) Files are split into variable-size chunks → each chunk is hashed → unique chunks are stored in the chunk store and files keep a stream map of references",
+        "C) Files are copied to a dedup staging area → identical files are linked together → originals are deleted",
+        "D) Files are encrypted → encrypted blocks are compared byte-by-byte → matching blocks are merged"
+      ],
+      "correct": "B",
+      "explanation": "Data Deduplication works by splitting files into variable-size chunks (32–128 KB) using Rabin fingerprinting, then hashing each chunk with SHA-256. Only unique chunks are stored in the chunk store under System Volume Information\\Dedup. Each deduplicated file retains a stream map that records which chunks (by hash reference) make up the file. This is a post-process operation — files are written normally first, then optimized by the dedup engine.",
+      "followup_tip": "Run `Get-DedupStatus -Volume D:` to see OptimizedFilesCount and SavedSpace, which show how many files have been processed and total space reclaimed."
+    },
+    {
+      "id": "L100-Q2",
+      "scenario": "A customer is evaluating Data Deduplication for several workloads in their environment. They have a general purpose file server, a Hyper-V VDI deployment with 200 similar Windows 10 desktops, and a SQL Server volume hosting database files (.mdf/.ldf). They want to know which workloads will benefit from dedup.",
+      "question": "Which workloads are supported by Data Deduplication?",
+      "choices": [
+        "A) General file server and SQL Server databases, but not Hyper-V VDI",
+        "B) All three workloads — file server, VDI, and SQL databases — are fully supported",
+        "C) General file server and Hyper-V VDI are supported, but SQL Server database volumes are not a supported workload",
+        "D) Only Hyper-V VDI is supported; file servers require third-party dedup solutions"
+      ],
+      "correct": "C",
+      "explanation": "Data Deduplication supports three primary workload types: General Purpose File Server (Default), Hyper-V VDI (HyperV), and Backup/Virtualized Backup. SQL Server database volumes are NOT supported because active database files have random I/O patterns that conflict with dedup optimization, and the performance overhead would be unacceptable. VDI typically achieves the highest savings (80–95%) because virtual desktops share nearly identical OS files.",
+      "followup_tip": "Use `Enable-DedupVolume -Volume D: -UsageType HyperV` for VDI workloads. The UsageType parameter adjusts chunking and scheduling behavior for the specific workload pattern."
+    },
+    {
+      "id": "L100-Q3",
+      "scenario": "A customer needs to prevent the Marketing department's shared folder from exceeding 50 GB. When the limit is reached, users should be blocked from saving additional files. However, for the Engineering department's share, they only want to receive an email alert at 80% usage without blocking anyone.",
+      "question": "Which FSRM quota configuration meets both requirements?",
+      "choices": [
+        "A) Create a soft quota for Marketing (50 GB) and a hard quota for Engineering (80% threshold)",
+        "B) Create a hard quota for Marketing (50 GB) and a soft quota for Engineering with a notification threshold at 80%",
+        "C) Create hard quotas for both departments — Marketing at 50 GB and Engineering at 80 GB",
+        "D) Create a single auto-apply quota at the parent level with a 50 GB limit"
+      ],
+      "correct": "B",
+      "explanation": "A hard quota enforces the limit and denies writes when the threshold is reached — this is what Marketing needs at 50 GB. A soft quota only monitors usage and sends alerts without blocking writes — this meets Engineering's requirement of alerting at 80% usage. Soft quotas support notification thresholds that can trigger email alerts, event log entries, or command actions when usage reaches the configured percentage.",
+      "followup_tip": "Create the Marketing quota with: `New-FsrmQuota -Path 'D:\\Shares\\Marketing' -Size 50GB` (hard by default). For Engineering: `New-FsrmQuota -Path 'D:\\Shares\\Engineering' -Size 100GB -SoftLimit` then configure a notification threshold at 80%."
+    },
+    {
+      "id": "L100-Q4",
+      "scenario": "A file server administrator wants to prevent users from storing audio and video files (MP3, AVI, MKV, etc.) on the company's document shares. When a user tries to save an MP3 file, the save should be denied. However, the IT team has a tools folder where they legitimately need to store some media files for testing.",
+      "question": "What FSRM feature should the administrator configure to block media files on the document shares while allowing them in the IT tools folder?",
+      "choices": [
+        "A) A passive file screen on the document shares with an active screen exception for the IT tools folder",
+        "B) An active file screen using the Audio and Video file group on the document shares, with a file screen exception for the IT tools folder",
+        "C) A hard quota on the document shares that limits media file sizes to 0 bytes",
+        "D) A file management task that deletes media files every hour from the document shares"
+      ],
+      "correct": "B",
+      "explanation": "An active file screen blocks users from saving files matching the specified file groups (like Audio and Video Files which includes *.mp3, *.avi, *.mkv). A file screen exception on the IT tools folder path allows that specific subdirectory to bypass the parent active screen for the specified file groups. A passive screen (option A) would only alert, not block. Quotas (option C) don't filter by file type. Deleting files after the fact (option D) is disruptive and not preventive.",
+      "followup_tip": "Apply with: `New-FsrmFileScreen -Path 'D:\\Shares\\Documents' -Template 'Block Audio and Video Files'` then `New-FsrmFileScreenException -Path 'D:\\Shares\\Documents\\IT\\Tools' -IncludeGroup 'Audio and Video Files'`."
+    }
+  ],
+  "L200": [
+    {
+      "id": "L200-Q1",
+      "scenario": "A customer enabled Data Deduplication on their file server volume three days ago with the Default usage type. They run Get-DedupStatus and see that OptimizedFilesCount is 0 and SavedSpace is 0 bytes, even though the volume has 500 GB of data. The optimization job shows as Completed with no errors.",
+      "question": "What is the most likely reason the optimization job completed without deduplicating any files?",
+      "choices": [
+        "A) The dedup chunk store is corrupted and needs to be repaired with Start-DedupJob -Type Scrubbing",
+        "B) The MinimumFileAge setting (default 3 days) means files must exist for at least 3 days before they are eligible for optimization",
+        "C) The volume has exceeded the maximum supported size for dedup and files are being silently skipped",
+        "D) The FSRM service is blocking the dedup optimization job from accessing files"
+      ],
+      "correct": "B",
+      "explanation": "By default, Data Deduplication has a MinimumFileAge of 3 days for the Default usage type. This means files must have existed on the volume for at least 3 days before they become eligible for optimization. Since dedup was just enabled 3 days ago and the data was already present, the files are just now becoming eligible. The next optimization run should start processing them. This is a deliberate design choice to avoid deduplicating files that are still being actively modified.",
+      "followup_tip": "Check the current setting with `Get-DedupVolume -Volume D: | Select-Object MinimumFileAge`. To reduce the wait: `Set-DedupVolume -Volume D: -MinimumFileAge 0` then `Start-DedupJob -Volume D: -Type Optimization`."
+    },
+    {
+      "id": "L200-Q2",
+      "scenario": "A customer's dedup-enabled volume is showing 95% full despite dedup reporting a 60% savings rate. They deleted 200 GB of files last week, but free space has barely increased. Get-DedupStatus shows the last garbage collection ran over 2 weeks ago and the LastGarbageCollectionResult shows an error code.",
+      "question": "What should be the first troubleshooting step to reclaim space from the deleted files?",
+      "choices": [
+        "A) Disable dedup on the volume and re-enable it to force a full re-optimization",
+        "B) Manually run a full garbage collection job to remove orphaned chunks left behind by the deleted files",
+        "C) Increase the volume size to provide more free space for the optimization job",
+        "D) Run integrity scrubbing to repair the chunk store before attempting any other action"
+      ],
+      "correct": "B",
+      "explanation": "When deduplicated files are deleted, the file's stream map is removed but the underlying chunks remain in the chunk store until garbage collection runs. If GC has not run successfully (last run was 2+ weeks ago with an error), orphaned chunks accumulate and space is not reclaimed. Running a full GC with `Start-DedupJob -Volume D: -Type GarbageCollection -Full` will scan the chunk store, identify chunks no longer referenced by any stream map, and delete them to free up space.",
+      "followup_tip": "Run `Start-DedupJob -Volume D: -Type GarbageCollection -Full` and monitor with `Get-DedupJob`. After completion, check `Get-DedupVolume -Volume D: | Select-Object FreeSpace, SavedSpace` to verify space was reclaimed."
+    },
+    {
+      "id": "L200-Q3",
+      "scenario": "A customer configured a hard quota of 10 GB on a shared folder. Users are reporting they can still save files even though the folder properties show 12 GB used. The administrator runs Get-FsrmQuota and sees the quota exists for the correct path with SoftLimit set to True.",
+      "question": "Why is the quota not blocking writes even though usage exceeds 10 GB?",
+      "choices": [
+        "A) The FSRM service needs to be restarted for the quota to take effect on existing data",
+        "B) The quota is configured as a soft limit (SoftLimit = True), which only monitors and alerts but never blocks writes",
+        "C) Hard quotas only enforce on new files, not on files that were present before the quota was created",
+        "D) The quota template is corrupted and needs to be recreated from scratch"
+      ],
+      "correct": "B",
+      "explanation": "The key indicator is `SoftLimit = True` in the Get-FsrmQuota output. A soft quota is a monitoring-only quota — it tracks usage and can send alerts when thresholds are reached, but it never blocks writes regardless of how far usage exceeds the limit. The administrator likely intended to create a hard quota (SoftLimit = False) which actively denies writes when the limit is reached. This is one of the most common FSRM configuration mistakes.",
+      "followup_tip": "Fix by removing the soft quota and creating a hard one: `Remove-FsrmQuota -Path 'D:\\Shares\\Data'` then `New-FsrmQuota -Path 'D:\\Shares\\Data' -Size 10GB` (hard quota is the default when -SoftLimit is not specified)."
+    }
+  ],
+  "L300": [
+    {
+      "id": "L300-Q1",
+      "scenario": "A senior engineer is investigating slow file access on a dedup-enabled volume. They suspect the chunk store structure may be contributing to latency. They notice container files (.ddc) are very large, stream map files (.dds) are numerous, and they want to understand how the system locates and reassembles data when a user opens a deduplicated file.",
+      "question": "When a user opens a deduplicated file, what is the correct sequence the dedup filter driver follows to reassemble the file contents?",
+      "choices": [
+        "A) Read the file's NTFS metadata → decompress the entire chunk store → extract matching blocks by file name",
+        "B) Read the file's stream map (.dds) to get chunk references → look up chunk hashes in the index → retrieve unique chunks from container files (.ddc) → reassemble the file in memory",
+        "C) Query Active Directory for the file's dedup policy → download chunks from the dedup cloud cache → assemble locally",
+        "D) Read the hotspot file (.ddh) which contains a complete cached copy of all recently accessed files"
+      ],
+      "correct": "B",
+      "explanation": "When a deduplicated file is accessed, the dedup minifilter driver intercepts the read request. It reads the file's stream map (stored as reparse point data and .dds files) which lists the ordered chunk references (hashes) that make up the file. It then looks up each hash in the chunk hash index to find the physical location within container files (.ddc). The chunks are read from the containers, decompressed if needed, and reassembled in the correct order in memory. Hotspot files (.ddh) cache frequently accessed chunks to accelerate this process but don't contain complete file copies.",
+      "followup_tip": "Use `Measure-DedupFileMetadata -Volume D: -Path 'D:\\Shares'` to measure the metadata overhead (stream map sizes) for a directory. Large stream maps increase read latency on heavily deduplicated files."
+    },
+    {
+      "id": "L300-Q2",
+      "scenario": "An organization needs to implement a data governance policy. Files containing Social Security Numbers (SSN patterns like XXX-XX-XXXX) must be automatically tagged as 'Confidential' so that Dynamic Access Control policies can restrict access to only authorized personnel. The tagging must happen automatically without manual intervention as new files are created.",
+      "question": "Which FSRM feature should be configured to automatically classify files containing SSN patterns and integrate with Dynamic Access Control?",
+      "choices": [
+        "A) FSRM file screens with active screening to block files containing SSN patterns from being saved",
+        "B) FSRM Content Classification rules that scan file contents with regex patterns and assign classification properties usable by Dynamic Access Control central access policies",
+        "C) FSRM storage reports configured to run daily and generate a list of files containing sensitive data",
+        "D) FSRM hard quotas on folders containing sensitive data to prevent unauthorized users from writing"
+      ],
+      "correct": "B",
+      "explanation": "FSRM Classification Infrastructure includes Content Classifier rules that scan file contents using regular expressions. You define a classification property (e.g., 'Confidentiality' with values Public/Internal/Confidential), then create a content classification rule with a regex like '\\d{3}-\\d{2}-\\d{4}' to detect SSN patterns. When the classification schedule runs (or is triggered manually with Start-FsrmClassification), matching files are tagged with the property value. These classification properties become resource properties in Active Directory, which Dynamic Access Control (DAC) central access policies can reference to enforce conditional access rules — e.g., only the HR Security group can access files classified as Confidential.",
+      "followup_tip": "Set up the rule: `New-FsrmClassificationRule -Name 'SSN Detection' -Namespace 'D:\\Shares' -Property 'Confidentiality' -PropertyValue 'Confidential' -ClassificationMechanism 'Content Classifier' -ContentRegularExpression '\\d{3}-\\d{2}-\\d{4}'` then run `Start-FsrmClassification` to process existing files."
+    }
+  ]
+}
